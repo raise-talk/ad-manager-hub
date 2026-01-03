@@ -72,19 +72,21 @@ export default function ClienteDetalhes() {
     queryFn: () => apiFetch<any[]>('/api/ad-accounts'),
   });
 
-  const adAccounts = client?.adAccounts?.map((item: any) => item.adAccount) ?? [];
-  const linkedAccountIds = new Set(adAccounts.map((account: any) => account.id));
-  const availableAccounts = allAccounts.filter(
-    (account: any) => !linkedAccountIds.has(account.id),
-  );
-
   useEffect(() => {
     if (client?.notes) {
       setNotes(client.notes);
     }
   }, [client?.notes]);
 
-  if (!client && !isLoading) {
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="p-6 text-muted-foreground">Carregando cliente...</div>
+      </AppLayout>
+    );
+  }
+
+  if (!client) {
     return (
       <AppLayout>
         <EmptyState
@@ -96,6 +98,12 @@ export default function ClienteDetalhes() {
       </AppLayout>
     );
   }
+
+  const adAccounts = client.adAccounts?.map((item: any) => item.adAccount) ?? [];
+  const linkedAccountIds = new Set(adAccounts.map((account: any) => account.id));
+  const availableAccounts = allAccounts.filter(
+    (account: any) => !linkedAccountIds.has(account.id),
+  );
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/require-auth";
 
+const normalizeBigInt = (value: bigint | null | undefined) =>
+  typeof value === "bigint" ? Number(value) : value;
+
 export async function GET(request: Request) {
   const { response } = await requireAuth();
   if (response) {
@@ -27,5 +30,22 @@ export async function GET(request: Request) {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(alerts);
+  const normalizedAlerts = alerts.map((alert) => ({
+    ...alert,
+    adAccount: alert.adAccount
+      ? {
+          ...alert.adAccount,
+          spendCap: normalizeBigInt(alert.adAccount.spendCap),
+        }
+      : null,
+    campaign: alert.campaign
+      ? {
+          ...alert.campaign,
+          dailyBudget: normalizeBigInt(alert.campaign.dailyBudget),
+          lifetimeBudget: normalizeBigInt(alert.campaign.lifetimeBudget),
+        }
+      : null,
+  }));
+
+  return NextResponse.json(normalizedAlerts);
 }

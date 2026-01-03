@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { encrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/require-auth";
-import { encrypt } from "@/lib/crypto";
 import {
   exchangeCodeForToken,
   exchangeForLongLivedToken,
   fetchMetaUser,
 } from "@/server/meta";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { response, session } = await requireAuth();
@@ -19,9 +19,11 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const state = searchParams.get("state");
   const storedState = cookies().get("meta_oauth_state")?.value;
-
+  console.log({ code, state, storedState });
   if (!code || !state || !storedState || state !== storedState) {
-    return NextResponse.redirect(new URL("/integracoes?status=error", request.url));
+    return NextResponse.redirect(
+      new URL("/integracoes?status=error", request.url)
+    );
   }
 
   try {
@@ -29,14 +31,16 @@ export async function GET(request: Request) {
     const longToken = await exchangeForLongLivedToken(shortToken.access_token);
     const metaUser = await fetchMetaUser(longToken.access_token);
 
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + longToken.expires_in);
+    const expiresIn = Number(longToken.expires_in);
+    const tokenExpiresAt = Number.isFinite(expiresIn)
+      ? new Date(Date.now() + expiresIn * 1000)
+      : null;
 
     await prisma.metaIntegration.upsert({
       where: { userId: session?.user.id ?? "" },
       update: {
         accessTokenEncrypted: encrypt(longToken.access_token),
-        tokenExpiresAt: expiresAt,
+        tokenExpiresAt: tokenExpiresAt ?? undefined,
         scopes: "ads_read,business_management,read_insights",
         status: "CONNECTED",
         connectedAt: new Date(),
@@ -46,7 +50,7 @@ export async function GET(request: Request) {
       create: {
         userId: session?.user.id ?? "",
         accessTokenEncrypted: encrypt(longToken.access_token),
-        tokenExpiresAt: expiresAt,
+        tokenExpiresAt: tokenExpiresAt ?? undefined,
         scopes: "ads_read,business_management,read_insights",
         status: "CONNECTED",
         connectedAt: new Date(),
@@ -61,6 +65,8 @@ export async function GET(request: Request) {
     return redirectResponse;
   } catch (error) {
     console.error(error);
-    return NextResponse.redirect(new URL("/integracoes?status=error", request.url));
+    return NextResponse.redirect(
+      new URL("/integracoes?status=error", request.url)
+    );
   }
 }

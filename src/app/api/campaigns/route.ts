@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/require-auth";
 
+const normalizeBigInt = (value: bigint | null | undefined) =>
+  typeof value === "bigint" ? Number(value) : value;
+
 export async function GET(request: Request) {
   const { response } = await requireAuth();
   if (response) {
@@ -41,6 +44,12 @@ export async function GET(request: Request) {
     const primaryClient = campaign.adAccount.clients.find((item) => item.isPrimary);
     return {
       ...campaign,
+      dailyBudget: normalizeBigInt(campaign.dailyBudget),
+      lifetimeBudget: normalizeBigInt(campaign.lifetimeBudget),
+      adAccount: {
+        ...campaign.adAccount,
+        spendCap: normalizeBigInt(campaign.adAccount.spendCap),
+      },
       clientId: primaryClient?.clientId ?? campaign.adAccount.clients[0]?.clientId ?? null,
     };
   });

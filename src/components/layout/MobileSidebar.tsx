@@ -47,7 +47,7 @@ export function MobileSidebar() {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
             <Link
-              to="/dashboard"
+              href="/dashboard"
               className="flex items-center gap-2"
               onClick={() => setMobileOpen(false)}
             >

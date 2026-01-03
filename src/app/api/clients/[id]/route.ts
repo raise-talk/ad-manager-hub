@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { clientSchema } from "@/lib/validators";
 import { requireAuth } from "@/lib/require-auth";
 
+const normalizeBigInt = (value: bigint | null | undefined) =>
+  typeof value === "bigint" ? Number(value) : value;
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } },
@@ -22,10 +25,24 @@ export async function GET(
   });
 
   if (!client) {
-    return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
+    return NextResponse.json({ error: "Cliente nao encontrado." }, { status: 404 });
   }
 
-  return NextResponse.json(client);
+  const normalizedClient = {
+    ...client,
+    adAccounts:
+      client.adAccounts?.map((item) => ({
+        ...item,
+        adAccount: item.adAccount
+          ? {
+              ...item.adAccount,
+              spendCap: normalizeBigInt(item.adAccount.spendCap),
+            }
+          : null,
+      })) ?? [],
+  };
+
+  return NextResponse.json(normalizedClient);
 }
 
 export async function PUT(

@@ -54,11 +54,58 @@ npm run dev
 
 This project is built with:
 
-- Vite
+- Next.js (App Router)
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Prisma + PostgreSQL
+
+## Backend + banco de dados (MVP)
+
+Este projeto inclui um schema Prisma e seed para dados iniciais (admin + clientes + contas + métricas).
+
+### Variáveis de ambiente
+
+Copie `.env.example` para `.env` e ajuste conforme necessário:
+
+```sh
+cp .env.example .env
+```
+
+### Subir o PostgreSQL via Docker
+
+```sh
+docker compose up -d
+```
+
+### Aplicar migrações e seed
+
+```sh
+npm install
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+### Rodar a aplicação localmente (fora do Docker)
+
+```sh
+npm run dev
+```
+
+### Credenciais do seed
+
+- Email: `admin@example.com`
+- Senha: `admin123`
+
+### Rotinas de sincronização/alertas
+
+Use um cron externo (ex.: Vercel Cron) ou rode manualmente:
+
+```sh
+curl -H "x-cron-secret=SEU_SEGREDO" http://localhost:3000/api/cron/sync
+curl -H "x-cron-secret=SEU_SEGREDO" http://localhost:3000/api/cron/alerts
+```
 
 ## How can I deploy this project?
 

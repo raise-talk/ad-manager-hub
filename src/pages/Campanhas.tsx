@@ -1,4 +1,6 @@
-import { useState } from 'react';
+"use client";
+
+import { useMemo, useState } from 'react';
 import {
   Search,
   Filter,
@@ -55,8 +57,8 @@ import {
 } from '@/components/ui/sheet';
 import { StatusBadge, ObjectiveBadge } from '@/components/shared/StatusBadge';
 import { KPICard } from '@/components/dashboard/KPICard';
-import { mockCampaigns, mockClients, mockAdAccounts, getClientById } from '@/data/mockData';
-import type { Campaign, CampaignStatus } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 const miniChartData = [
   { day: '1', value: 120 },
@@ -72,7 +74,32 @@ export default function Campanhas() {
   const [searchQuery, setSearchQuery] = useState('');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<any | null>(null);
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => apiFetch<any[]>('/api/clients'),
+  });
+
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['campaigns', clientFilter, statusFilter, searchQuery],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (clientFilter !== 'all') params.set('clientId', clientFilter);
+      if (statusFilter !== 'all') {
+        const mapped =
+          statusFilter === 'ativo'
+            ? 'ACTIVE'
+            : statusFilter === 'pausado'
+            ? 'PAUSED'
+            : statusFilter === 'em_revisao'
+            ? 'IN_REVIEW'
+            : 'ARCHIVED';
+        params.set('status', mapped);
+      }
+      if (searchQuery) params.set('search', searchQuery);
+      return apiFetch<any[]>(`/api/campaigns?${params.toString()}`);
+    },
+  });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -81,16 +108,37 @@ export default function Campanhas() {
     }).format(value);
   };
 
-  const filteredCampaigns = mockCampaigns.filter((campaign) => {
-    const matchesSearch = campaign.nome.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesClient = clientFilter === 'all' || campaign.clientId === clientFilter;
-    const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
-    return matchesSearch && matchesClient && matchesStatus;
-  });
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter((campaign) =>
+      campaign.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }, [campaigns, searchQuery]);
 
-  const totalGasto = filteredCampaigns.reduce((acc, c) => acc + c.gastoTotal, 0);
-  const totalResultados = filteredCampaigns.reduce((acc, c) => acc + c.resultados, 0);
+  const totalGasto = filteredCampaigns.reduce(
+    (acc: number, c: any) => acc + Number(c.dailyBudget ?? 0),
+    0,
+  );
+  const totalResultados = filteredCampaigns.reduce((acc: number, c: any) => acc + Number(c.leads ?? 0), 0);
   const avgCPA = totalResultados > 0 ? totalGasto / totalResultados : 0;
+
+  const mapObjective = (objective?: string) => {
+    if (!objective) return 'leads';
+    const normalized = objective.toLowerCase();
+    if (normalized.includes('conversion')) return 'conversoes';
+    if (normalized.includes('traffic')) return 'trafego';
+    if (normalized.includes('reach')) return 'alcance';
+    if (normalized.includes('engagement')) return 'engajamento';
+    return 'leads';
+  };
+
+  const mapStatus = (status?: string) => {
+    if (!status) return 'ativo';
+    const normalized = status.toLowerCase();
+    if (normalized.includes('paused')) return 'pausado';
+    if (normalized.includes('review')) return 'em_revisao';
+    if (normalized.includes('archived') || normalized.includes('completed')) return 'encerrado';
+    return 'ativo';
+  };
 
   return (
     <AppLayout>
@@ -109,7 +157,7 @@ export default function Campanhas() {
         <div className="grid gap-4 md:grid-cols-4">
           <KPICard
             title="Campanhas Ativas"
-            value={filteredCampaigns.filter(c => c.status === 'ativo').length}
+            value={filteredCampaigns.filter((c: any) => mapStatus(c.status) === 'ativo').length}
             icon={Play}
           />
           <KPICard
@@ -148,9 +196,9 @@ export default function Campanhas() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os clientes</SelectItem>
-                  {mockClients.map((client) => (
+                  {clients.map((client: any) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.nome}
+                      {client.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -190,31 +238,31 @@ export default function Campanhas() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCampaigns.map((campaign) => {
-                  const client = getClientById(campaign.clientId);
+                {filteredCampaigns.map((campaign: any) => {
+                  const client = clients.find((item: any) => item.id === campaign.clientId);
                   return (
                     <TableRow
                       key={campaign.id}
                       className="cursor-pointer"
                       onClick={() => setSelectedCampaign(campaign)}
                     >
-                      <TableCell className="font-medium">{campaign.nome}</TableCell>
-                      <TableCell>{client?.nome}</TableCell>
+                      <TableCell className="font-medium">{campaign.name}</TableCell>
+                      <TableCell>{client?.name}</TableCell>
                       <TableCell>
-                        <ObjectiveBadge objective={campaign.objetivo} />
+                        <ObjectiveBadge objective={mapObjective(campaign.objective)} />
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={campaign.status} />
+                        <StatusBadge status={mapStatus(campaign.status)} />
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(campaign.orcamentoDiario)}
+                        {formatCurrency(Number(campaign.dailyBudget ?? 0) / 100)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(campaign.gastoTotal)}
+                        {formatCurrency(Number(campaign.lifetimeBudget ?? 0) / 100)}
                       </TableCell>
-                      <TableCell className="text-right">{campaign.resultados}</TableCell>
+                      <TableCell className="text-right">{campaign.leads ?? 0}</TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(campaign.cpa)}
+                        {formatCurrency(Number(campaign.dailyBudget ?? 0) / 100)}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -250,11 +298,11 @@ export default function Campanhas() {
               <>
                 <SheetHeader>
                   <div className="flex items-center justify-between">
-                    <SheetTitle>{selectedCampaign.nome}</SheetTitle>
-                    <StatusBadge status={selectedCampaign.status} />
+                    <SheetTitle>{selectedCampaign.name}</SheetTitle>
+                    <StatusBadge status={mapStatus(selectedCampaign.status)} />
                   </div>
                   <SheetDescription>
-                    {getClientById(selectedCampaign.clientId)?.nome}
+                    {clients.find((item: any) => item.id === selectedCampaign.clientId)?.name}
                   </SheetDescription>
                 </SheetHeader>
                 <div className="space-y-6 mt-6">
@@ -293,21 +341,21 @@ export default function Campanhas() {
                       <CardContent className="pt-4">
                         <p className="text-sm text-muted-foreground">Gasto Total</p>
                         <p className="text-xl font-bold">
-                          {formatCurrency(selectedCampaign.gastoTotal)}
+                          {formatCurrency(Number(selectedCampaign.lifetimeBudget ?? 0) / 100)}
                         </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="pt-4">
                         <p className="text-sm text-muted-foreground">Resultados</p>
-                        <p className="text-xl font-bold">{selectedCampaign.resultados}</p>
+                        <p className="text-xl font-bold">{selectedCampaign.leads ?? 0}</p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="pt-4">
                         <p className="text-sm text-muted-foreground">CPA</p>
                         <p className="text-xl font-bold">
-                          {formatCurrency(selectedCampaign.cpa)}
+                          {formatCurrency(Number(selectedCampaign.dailyBudget ?? 0) / 100)}
                         </p>
                       </CardContent>
                     </Card>
@@ -315,7 +363,7 @@ export default function Campanhas() {
                       <CardContent className="pt-4">
                         <p className="text-sm text-muted-foreground">Orç. Diário</p>
                         <p className="text-xl font-bold">
-                          {formatCurrency(selectedCampaign.orcamentoDiario)}
+                          {formatCurrency(Number(selectedCampaign.dailyBudget ?? 0) / 100)}
                         </p>
                       </CardContent>
                     </Card>
@@ -326,12 +374,12 @@ export default function Campanhas() {
                     <CardContent className="pt-4 space-y-3">
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Objetivo</span>
-                        <ObjectiveBadge objective={selectedCampaign.objetivo} />
+                        <ObjectiveBadge objective={mapObjective(selectedCampaign.objective)} />
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Última alteração</span>
                         <span className="text-sm">
-                          {format(selectedCampaign.ultimaAlteracao, "dd/MM/yyyy 'às' HH:mm", {
+                          {format(new Date(selectedCampaign.updatedAt), "dd/MM/yyyy 'às' HH:mm", {
                             locale: ptBR,
                           })}
                         </span>

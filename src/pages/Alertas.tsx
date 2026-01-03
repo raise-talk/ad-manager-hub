@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Bell,
   Filter,
@@ -29,19 +31,58 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { mockAlerts } from '@/data/mockData';
-import type { Alert, AlertStatus, AlertSeverity } from '@/types';
+import type { Alert, AlertSeverity } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 export default function Alertas() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('feed');
+  const [threshold, setThreshold] = useState(0);
+  const [alertsEnabled, setAlertsEnabled] = useState(true);
 
-  const filteredAlerts = mockAlerts.filter((alert) => {
-    const matchesStatus = statusFilter === 'all' || alert.status === statusFilter;
-    const matchesSeverity = severityFilter === 'all' || alert.severidade === severityFilter;
-    return matchesStatus && matchesSeverity;
+  const { data: alertConfig, refetch: refetchConfig } = useQuery({
+    queryKey: ['alerts', 'config'],
+    queryFn: () => apiFetch<any>('/api/alerts/config'),
+  });
+
+  useEffect(() => {
+    if (alertConfig) {
+      setThreshold(alertConfig.budgetLowThreshold / 100);
+      setAlertsEnabled(alertConfig.enabled);
+    }
+  }, [alertConfig]);
+
+  const { data: alerts = [], refetch } = useQuery({
+    queryKey: ['alerts', statusFilter, severityFilter],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') {
+        const mapped = statusFilter === 'novo' ? 'NEW' : statusFilter === 'lido' ? 'READ' : 'RESOLVED';
+        params.set('status', mapped);
+      }
+      return apiFetch<any[]>(`/api/alerts?${params.toString()}`);
+    },
+  });
+
+  const mapSeverity = (severity: 'LOW' | 'MEDIUM' | 'HIGH'): AlertSeverity => {
+    if (severity === 'HIGH') return 'critical';
+    if (severity === 'MEDIUM') return 'warning';
+    return 'info';
+  };
+
+  const mapStatus = (status: 'NEW' | 'READ' | 'RESOLVED') => {
+    if (status === 'NEW') return 'novo';
+    if (status === 'READ') return 'lido';
+    return 'resolvido';
+  };
+
+  const filteredAlerts = alerts.filter((alert) => {
+    const matchesSeverity =
+      severityFilter === 'all' || mapSeverity(alert.severity) === severityFilter;
+    return matchesSeverity;
   });
 
   const getSeverityIcon = (severity: AlertSeverity) => {
@@ -55,7 +96,17 @@ export default function Alertas() {
     }
   };
 
-  const newAlertsCount = mockAlerts.filter(a => a.status === 'novo').length;
+  const newAlertsCount = alerts.filter((alert) => alert.status === 'NEW').length;
+
+  const handleMarkAllRead = async () => {
+    const unread = alerts.filter((alert) => alert.status === 'NEW');
+    await Promise.all(
+      unread.map((alert) =>
+        apiFetch(`/api/alerts/${alert.id}/read`, { method: 'POST' }),
+      ),
+    );
+    await refetch();
+  };
 
   return (
     <AppLayout>
@@ -110,7 +161,7 @@ export default function Alertas() {
                     </SelectContent>
                   </Select>
                   <div className="flex-1" />
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Marcar todos como lidos
                   </Button>
@@ -132,30 +183,32 @@ export default function Alertas() {
                 </Card>
               ) : (
                 filteredAlerts.map((alert) => {
-                  const SeverityIcon = getSeverityIcon(alert.severidade);
+                  const severity = mapSeverity(alert.severity);
+                  const status = mapStatus(alert.status);
+                  const SeverityIcon = getSeverityIcon(severity);
                   return (
                     <Card
                       key={alert.id}
                       className={`transition-all hover:shadow-md ${
-                        alert.status === 'novo' ? 'border-l-4 border-l-primary' : ''
+                        status === 'novo' ? 'border-l-4 border-l-primary' : ''
                       }`}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">
                           <div
                             className={`p-2 rounded-lg ${
-                              alert.severidade === 'critical'
+                              severity === 'critical'
                                 ? 'bg-destructive/10'
-                                : alert.severidade === 'warning'
+                                : severity === 'warning'
                                 ? 'bg-warning/10'
                                 : 'bg-info/10'
                             }`}
                           >
                             <SeverityIcon
                               className={`h-5 w-5 ${
-                                alert.severidade === 'critical'
+                                severity === 'critical'
                                   ? 'text-destructive'
-                                  : alert.severidade === 'warning'
+                                  : severity === 'warning'
                                   ? 'text-warning'
                                   : 'text-info'
                               }`}
@@ -163,31 +216,58 @@ export default function Alertas() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium">{alert.clienteNome}</span>
+                              <span className="font-medium">{alert.client?.name ?? 'Conta'}</span>
                               <span className="text-muted-foreground">•</span>
                               <span className="text-sm text-muted-foreground">
-                                {alert.contaNome}
+                                {alert.adAccount?.name ?? 'Meta'}
                               </span>
                             </div>
                             <p className="text-sm text-muted-foreground mb-2">
-                              {alert.mensagem}
+                              {alert.message}
                             </p>
                             <div className="flex items-center gap-3">
-                              <SeverityBadge severity={alert.severidade} />
-                              <StatusBadge status={alert.status} />
+                              <SeverityBadge severity={severity} />
+                              <StatusBadge status={status} />
                               <span className="text-xs text-muted-foreground">
-                                {format(alert.dataHora, "dd/MM 'às' HH:mm", { locale: ptBR })}
+                                {format(new Date(alert.createdAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
                               </span>
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate('/campanhas')}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver conta
-                          </Button>
+                          <div className="flex flex-col gap-2">
+                            {alert.status === 'NEW' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  await apiFetch(`/api/alerts/${alert.id}/read`, { method: 'POST' });
+                                  await refetch();
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                Marcar lido
+                              </Button>
+                            )}
+                            {alert.status !== 'RESOLVED' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  await apiFetch(`/api/alerts/${alert.id}/resolve`, { method: 'POST' });
+                                  await refetch();
+                                }}
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Resolver
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => router.push('/campanhas')}
+                            >
+                              Ver conta
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -208,20 +288,40 @@ export default function Alertas() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Alerta de orçamento baixo (%)</Label>
-                    <Input type="number" defaultValue={80} min={50} max={95} />
+                    <Label>Limite de orçamento baixo (R$)</Label>
+                    <Input
+                      type="number"
+                      value={threshold}
+                      min={0}
+                      onChange={(event) => setThreshold(Number(event.target.value))}
+                    />
                     <p className="text-xs text-muted-foreground">
-                      Receba um alerta quando o gasto atingir este percentual do orçamento
+                      Alertas são gerados quando o orçamento diário estiver abaixo deste valor.
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Alerta crítico (%)</Label>
-                    <Input type="number" defaultValue={95} min={80} max={100} />
-                    <p className="text-xs text-muted-foreground">
-                      Alerta urgente quando próximo do limite total
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Alertas ativos</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Ative ou desative o monitoramento automático.
+                      </p>
+                    </div>
+                    <Switch checked={alertsEnabled} onCheckedChange={setAlertsEnabled} />
                   </div>
-                  <Button>Salvar Limites</Button>
+                  <Button
+                    onClick={async () => {
+                      await apiFetch('/api/alerts/config', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          budgetLowThreshold: Math.round(threshold * 100),
+                          enabled: alertsEnabled,
+                        }),
+                      });
+                      await refetchConfig();
+                    }}
+                  >
+                    Salvar configurações
+                  </Button>
                 </CardContent>
               </Card>
 

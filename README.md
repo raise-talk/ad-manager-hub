@@ -54,11 +54,12 @@ npm run dev
 
 This project is built with:
 
-- Vite
+- Next.js (App Router)
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Prisma + PostgreSQL
 
 ## Backend + banco de dados (MVP)
 
@@ -96,6 +97,15 @@ npm run dev
 
 - Email: `admin@example.com`
 - Senha: `admin123`
+
+### Rotinas de sincronização/alertas
+
+Use um cron externo (ex.: Vercel Cron) ou rode manualmente:
+
+```sh
+curl -H "x-cron-secret=SEU_SEGREDO" http://localhost:3000/api/cron/sync
+curl -H "x-cron-secret=SEU_SEGREDO" http://localhost:3000/api/cron/alerts
+```
 
 ## How can I deploy this project?
 

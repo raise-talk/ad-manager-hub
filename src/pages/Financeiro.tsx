@@ -1,4 +1,6 @@
-import { useState } from 'react';
+"use client";
+
+import { useMemo, useState } from 'react';
 import {
   DollarSign,
   Users,
@@ -39,13 +41,32 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { KPICard } from '@/components/dashboard/KPICard';
-import { mockClients, mockReceitaMensal, mockFinancialGoals } from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 export default function Financeiro() {
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({
     metaClientes: '',
     metaReceita: '',
+  });
+
+  const month = new Date().getMonth() + 1;
+  const year = new Date().getFullYear();
+
+  const { data: finance } = useQuery({
+    queryKey: ['finance', month, year],
+    queryFn: () => apiFetch<any>(`/api/finance/summary?month=${month}&year=${year}`),
+  });
+
+  const { data: goal, refetch } = useQuery({
+    queryKey: ['goals', month, year],
+    queryFn: () => apiFetch<any>(`/api/goals?month=${month}&year=${year}`),
+  });
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => apiFetch<any[]>('/api/clients'),
   });
 
   const formatCurrency = (value: number) => {
@@ -55,16 +76,35 @@ export default function Financeiro() {
     }).format(value);
   };
 
-  const clientesAtivos = mockClients.filter(c => c.status === 'ativo');
-  const mrr = clientesAtivos.reduce((acc, c) => acc + c.valorMensal, 0);
-  const ticketMedio = clientesAtivos.length > 0 ? mrr / clientesAtivos.length : 0;
-  
-  const currentGoal = mockFinancialGoals[0];
-  const progressClientes = currentGoal ? (currentGoal.clientesAtingidos / currentGoal.metaClientes) * 100 : 0;
-  const progressReceita = currentGoal ? (currentGoal.receitaAtingida / currentGoal.metaReceita) * 100 : 0;
+  const mrr = finance?.mrr ?? 0;
+  const clientesAtivos = finance?.clientesAtivos ?? 0;
+  const ticketMedio = finance?.ticketMedio ?? 0;
+  const progressClientes = Math.round((finance?.progressClients ?? 0) * 100);
+  const progressReceita = Math.round((finance?.progressRevenue ?? 0) * 100);
 
-  const handleSaveGoal = (e: React.FormEvent) => {
+  const receitaMensal = useMemo(() => {
+    return Array.from({ length: 6 }).map((_, index) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - (5 - index));
+      return {
+        date: date.toLocaleDateString('pt-BR', { month: 'short' }),
+        value: mrr,
+      };
+    });
+  }, [mrr]);
+
+  const handleSaveGoal = async (e: React.FormEvent) => {
     e.preventDefault();
+    await apiFetch('/api/goals', {
+      method: 'POST',
+      body: JSON.stringify({
+        month,
+        year,
+        targetClients: Number(newGoal.metaClientes),
+        targetRevenue: Math.round(Number(newGoal.metaReceita) * 100),
+      }),
+    });
+    await refetch();
     setIsGoalDialogOpen(false);
     setNewGoal({ metaClientes: '', metaReceita: '' });
   };
@@ -86,26 +126,30 @@ export default function Financeiro() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <KPICard
             title="MRR"
-            value={formatCurrency(mrr)}
+            value={formatCurrency(mrr / 100)}
             icon={DollarSign}
             change={{ value: 8.5, trend: 'up' }}
           />
           <KPICard
             title="Clientes Ativos"
-            value={clientesAtivos.length}
+            value={clientesAtivos}
             icon={Users}
-            subtitle={`de ${mockClients.length} cadastrados`}
+            subtitle="total ativo"
           />
           <KPICard
             title="Ticket Médio"
-            value={formatCurrency(ticketMedio)}
+            value={formatCurrency(ticketMedio / 100)}
             icon={TrendingUp}
           />
           <KPICard
             title="Meta do Mês"
-            value={`${Math.round(progressReceita)}%`}
+            value={`${progressReceita}%`}
             icon={Target}
-            subtitle={currentGoal ? `${formatCurrency(currentGoal.receitaAtingida)} / ${formatCurrency(currentGoal.metaReceita)}` : 'Sem meta'}
+            subtitle={
+              goal
+                ? `${formatCurrency(mrr / 100)} / ${formatCurrency(goal.targetRevenue / 100)}`
+                : 'Sem meta'
+            }
           />
         </div>
 
@@ -119,7 +163,7 @@ export default function Financeiro() {
             <CardContent>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={mockReceitaMensal}>
+                  <BarChart data={receitaMensal}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis
                       dataKey="date"
@@ -157,7 +201,9 @@ export default function Financeiro() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Metas do Mês</CardTitle>
-                <CardDescription>{currentGoal?.mes || 'Defina suas metas'}</CardDescription>
+                <CardDescription>
+                  {goal ? `${month}/${year}` : 'Defina suas metas'}
+                </CardDescription>
               </div>
               <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
                 <DialogTrigger asChild>
@@ -211,31 +257,30 @@ export default function Financeiro() {
               </Dialog>
             </CardHeader>
             <CardContent className="space-y-6">
-              {currentGoal ? (
+              {goal ? (
                 <>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span>Clientes</span>
                       <span className="font-medium">
-                        {currentGoal.clientesAtingidos} / {currentGoal.metaClientes}
+                        {clientesAtivos} / {goal.targetClients}
                       </span>
                     </div>
                     <Progress value={progressClientes} className="h-2" />
                     <p className="text-xs text-muted-foreground">
-                      {Math.round(progressClientes)}% da meta atingida
+                      {progressClientes}% da meta atingida
                     </p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span>Receita</span>
                       <span className="font-medium">
-                        {formatCurrency(currentGoal.receitaAtingida)} /{' '}
-                        {formatCurrency(currentGoal.metaReceita)}
+                        {formatCurrency(mrr / 100)} / {formatCurrency(goal.targetRevenue / 100)}
                       </span>
                     </div>
                     <Progress value={progressReceita} className="h-2" />
                     <p className="text-xs text-muted-foreground">
-                      {Math.round(progressReceita)}% da meta atingida
+                      {progressReceita}% da meta atingida
                     </p>
                   </div>
                 </>
@@ -267,22 +312,22 @@ export default function Financeiro() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockClients
-                  .filter((c) => c.status !== 'arquivado')
-                  .map((client) => (
+                {clients
+                  .filter((client: any) => client.status !== 'ARCHIVED')
+                  .map((client: any) => (
                     <TableRow key={client.id}>
-                      <TableCell className="font-medium">{client.nome}</TableCell>
-                      <TableCell>{formatCurrency(client.valorMensal)}</TableCell>
+                      <TableCell className="font-medium">{client.name}</TableCell>
+                      <TableCell>{formatCurrency(client.monthlyFee / 100)}</TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
                           className={
-                            client.status === 'ativo'
+                            client.status === 'ACTIVE'
                               ? 'bg-success/15 text-success border-success/30'
                               : 'bg-warning/15 text-warning border-warning/30'
                           }
                         >
-                          {client.status === 'ativo' ? 'Em dia' : 'Pausado'}
+                          {client.status === 'ACTIVE' ? 'Em dia' : 'Pausado'}
                         </Badge>
                       </TableCell>
                       <TableCell>05/01/2025</TableCell>

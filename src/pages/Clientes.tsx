@@ -1,5 +1,7 @@
+"use client";
+
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import {
   Plus,
   Search,
@@ -49,11 +51,12 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { mockClients } from '@/data/mockData';
 import type { Client, ClientType, ClientStatus } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 export default function Clientes() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -77,17 +80,47 @@ export default function Clientes() {
     }).format(value);
   };
 
-  const filteredClients = mockClients.filter((client) => {
-    const matchesSearch =
-      client.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.cidade.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const { data: clients = [], refetch } = useQuery({
+    queryKey: ['clients', statusFilter, searchQuery],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') {
+        const mapped =
+          statusFilter === 'ativo'
+            ? 'ACTIVE'
+            : statusFilter === 'pausado'
+            ? 'PAUSED'
+            : 'ARCHIVED';
+        params.set('status', mapped);
+      }
+      if (searchQuery) params.set('search', searchQuery);
+      return apiFetch<any[]>(`/api/clients?${params.toString()}`);
+    },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock submit
+    await apiFetch('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: formData.tipo === 'corretor' ? 'BROKER' : 'REAL_ESTATE',
+        name: formData.nome,
+        city: formData.cidade,
+        state: formData.uf,
+        whatsapp: formData.whatsapp || undefined,
+        instagram: formData.instagram || undefined,
+        website: formData.site || undefined,
+        monthlyFee: Math.round(Number(formData.valorMensal) * 100),
+        status:
+          formData.status === 'ativo'
+            ? 'ACTIVE'
+            : formData.status === 'pausado'
+            ? 'PAUSED'
+            : 'ARCHIVED',
+        notes: formData.observacoes || undefined,
+      }),
+    });
+    await refetch();
     setIsDialogOpen(false);
     setFormData({
       tipo: 'corretor',
@@ -325,23 +358,23 @@ export default function Clientes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.map((client) => (
+                {clients.map((client) => (
                   <TableRow
                     key={client.id}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/clientes/${client.id}`)}
+                    onClick={() => router.push(`/clientes/${client.id}`)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                          {client.tipo === 'imobiliaria' ? (
+                          {client.type === 'REAL_ESTATE' ? (
                             <Building2 className="h-4 w-4 text-muted-foreground" />
                           ) : (
                             <User className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
                         <div>
-                          <p className="font-medium">{client.nome}</p>
+                          <p className="font-medium">{client.name}</p>
                           {client.instagram && (
                             <p className="text-xs text-muted-foreground">
                               {client.instagram}
@@ -351,19 +384,27 @@ export default function Clientes() {
                       </div>
                     </TableCell>
                     <TableCell className="capitalize">
-                      {client.tipo === 'imobiliaria' ? 'Imobiliária' : 'Corretor'}
+                      {client.type === 'REAL_ESTATE' ? 'Imobiliária' : 'Corretor'}
                     </TableCell>
                     <TableCell>
-                      {client.cidade}/{client.uf}
+                      {client.city}/{client.state}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={client.status} />
+                      <StatusBadge
+                        status={
+                          client.status === 'ACTIVE'
+                            ? 'ativo'
+                            : client.status === 'PAUSED'
+                            ? 'pausado'
+                            : 'arquivado'
+                        }
+                      />
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(client.valorMensal)}
+                      {formatCurrency(client.monthlyFee / 100)}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
-                      {format(client.updatedAt, 'dd/MM/yyyy', { locale: ptBR })}
+                      {format(new Date(client.updatedAt), 'dd/MM/yyyy', { locale: ptBR })}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -373,7 +414,7 @@ export default function Clientes() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/clientes/${client.id}`)}>
+                          <DropdownMenuItem onClick={() => router.push(`/clientes/${client.id}`)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Ver detalhes
                           </DropdownMenuItem>
@@ -381,7 +422,16 @@ export default function Clientes() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={async (event) => {
+                              event.stopPropagation();
+                              await apiFetch(`/api/clients/${client.id}`, {
+                                method: 'DELETE',
+                              });
+                              await refetch();
+                            }}
+                          >
                             <Archive className="mr-2 h-4 w-4" />
                             Arquivar
                           </DropdownMenuItem>

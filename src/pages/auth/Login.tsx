@@ -1,5 +1,9 @@
+"use client";
+
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Zap, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Login() {
-  const navigate = useNavigate();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -17,15 +22,27 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    
-    // Simulated login
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (email && password) {
-      navigate('/dashboard');
-    } else {
+
+    if (!email || !password) {
       setError('Preencha todos os campos');
+      setIsLoading(false);
+      return;
     }
+    
+    const callbackUrl = searchParams.get('from') ?? '/dashboard';
+    const result = await signIn('credentials', {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (!result?.ok) {
+      setError('Email ou senha inválidos.');
+      setIsLoading(false);
+      return;
+    }
+
+    router.push(callbackUrl);
     setIsLoading(false);
   };
 
@@ -74,7 +91,7 @@ export default function Login() {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Senha</Label>
                   <Link
-                    to="/recuperar-senha"
+                    href="/recuperar-senha"
                     className="text-xs text-primary hover:underline"
                   >
                     Esqueceu a senha?
@@ -108,7 +125,7 @@ export default function Login() {
 
             <div className="mt-6 text-center text-sm text-muted-foreground">
               Não tem uma conta?{' '}
-              <Link to="/cadastro" className="text-primary hover:underline font-medium">
+              <Link href="/cadastro" className="text-primary hover:underline font-medium">
                 Criar conta
               </Link>
             </div>

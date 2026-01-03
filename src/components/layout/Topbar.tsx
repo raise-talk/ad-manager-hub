@@ -1,5 +1,9 @@
+"use client";
+
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
+import { signOut, useSession } from 'next-auth/react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Search,
   Menu,
@@ -22,18 +26,23 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useSidebar } from '@/components/layout/SidebarContext';
-import { mockUser, mockAlerts } from '@/data/mockData';
+import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export function Topbar() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { collapsed, setCollapsed, setMobileOpen } = useSidebar();
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const unreadAlerts = mockAlerts.filter(a => a.status === 'novo').length;
+  const { data: session } = useSession();
+  const { data: alerts = [] } = useQuery({
+    queryKey: ['alerts', 'preview'],
+    queryFn: () => apiFetch<any[]>('/api/alerts?status=new'),
+  });
+
+  const unreadAlerts = alerts.length;
 
   const handleLogout = () => {
-    navigate('/login');
+    signOut({ callbackUrl: '/login' });
   };
 
   return (
@@ -101,36 +110,38 @@ export function Topbar() {
               <Badge variant="secondary">{unreadAlerts} novos</Badge>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {mockAlerts.slice(0, 3).map((alert) => (
+            {alerts.slice(0, 3).map((alert) => (
               <DropdownMenuItem
                 key={alert.id}
                 className="flex flex-col items-start gap-1 p-3"
-                onClick={() => navigate('/alertas')}
+                onClick={() => router.push('/alertas')}
               >
                 <div className="flex w-full items-center justify-between">
-                  <span className="font-medium text-sm">{alert.clienteNome}</span>
+                  <span className="font-medium text-sm">
+                    {alert.client?.name ?? 'Conta'}
+                  </span>
                   <Badge
                     variant={
-                      alert.severidade === 'critical'
+                      alert.severity === 'HIGH'
                         ? 'destructive'
-                        : alert.severidade === 'warning'
+                        : alert.severity === 'MEDIUM'
                         ? 'secondary'
                         : 'outline'
                     }
                     className="text-xs"
                   >
-                    {alert.severidade}
+                    {alert.severity}
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {alert.mensagem}
+                  {alert.message}
                 </span>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="justify-center text-primary"
-              onClick={() => navigate('/alertas')}
+              onClick={() => router.push('/alertas')}
             >
               Ver todos os alertas
             </DropdownMenuItem>
@@ -142,29 +153,31 @@ export function Topbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2 pl-2 pr-1">
               <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  {mockUser.nome.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium md:inline-block">
-                {mockUser.nome}
-              </span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                {session?.user?.name?.charAt(0) ?? "A"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="hidden text-sm font-medium md:inline-block">
+              {session?.user?.name ?? "Admin"}
+            </span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{mockUser.nome}</p>
-                <p className="text-xs text-muted-foreground">{mockUser.email}</p>
+                <p className="text-sm font-medium">{session?.user?.name ?? "Admin"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {session?.user?.email ?? ''}
+                </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
+            <DropdownMenuItem onClick={() => router.push('/configuracoes')}>
               <User className="mr-2 h-4 w-4" />
               Perfil
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
+            <DropdownMenuItem onClick={() => router.push('/configuracoes')}>
               <Settings className="mr-2 h-4 w-4" />
               Configurações
             </DropdownMenuItem>

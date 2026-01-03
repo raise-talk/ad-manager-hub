@@ -1,4 +1,6 @@
-import { useState } from 'react';
+"use client";
+
+import { useMemo, useState } from 'react';
 import {
   Facebook,
   CheckCircle2,
@@ -26,25 +28,43 @@ import {
   AlertDescription,
   AlertTitle,
 } from '@/components/ui/alert';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 export default function Integracoes() {
-  const [isConnected, setIsConnected] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { data: integration, refetch } = useQuery({
+    queryKey: ['meta', 'integration'],
+    queryFn: () => apiFetch<any>('/api/meta/integration'),
+  });
 
-  const mockAccounts = [
-    { id: '1', name: 'Vista Mar Imobiliária', accountId: 'act_123456789', status: 'ativo' },
-    { id: '2', name: 'João Silva Ads', accountId: 'act_987654321', status: 'ativo' },
-    { id: '3', name: 'Prime Imóveis - Vendas', accountId: 'act_456789123', status: 'ativo' },
-    { id: '4', name: 'Prime Imóveis - Locação', accountId: 'act_789123456', status: 'pausado' },
-  ];
+  const { data: adAccounts = [], refetch: refetchAccounts } = useQuery({
+    queryKey: ['ad-accounts'],
+    queryFn: () => apiFetch<any[]>('/api/ad-accounts'),
+  });
+
+  const isConnected = integration?.status === 'CONNECTED';
+
+  const connectedName = integration?.metaUserName ?? 'Conta Meta';
+  const connectedId = integration?.metaUserId ?? '—';
 
   const handleConnect = () => {
-    // Mock connect action
-    setIsConnected(true);
+    window.location.href = '/api/meta/oauth/start';
   };
 
-  const handleDisconnect = () => {
-    setIsConnected(false);
+  const handleDisconnect = async () => {
+    await apiFetch('/api/meta/integration', { method: 'DELETE' });
+    await refetch();
   };
+
+  const handleSyncAccounts = async () => {
+    setIsSyncing(true);
+    await apiFetch('/api/meta/sync-accounts', { method: 'POST' });
+    await refetchAccounts();
+    setIsSyncing(false);
+  };
+
+  const accounts = useMemo(() => adAccounts, [adAccounts]);
 
   return (
     <AppLayout>
@@ -85,32 +105,32 @@ export default function Integracoes() {
             </div>
           </div>
           <CardContent className="p-6">
-            {isConnected ? (
-              <div className="space-y-6">
-                {/* Connected Profile */}
-                <div className="flex items-center justify-between p-4 rounded-lg bg-muted">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Facebook className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Gestor de Tráfego Pro</p>
+              {isConnected ? (
+                <div className="space-y-6">
+                  {/* Connected Profile */}
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Facebook className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                      <p className="font-medium">{connectedName}</p>
                       <p className="text-sm text-muted-foreground">
-                        Business ID: 1234567890
+                        Business ID: {connectedId}
                       </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Reconectar
+                    <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleSyncAccounts} disabled={isSyncing}>
+                      <RefreshCw className={isSyncing ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
+                      Sincronizar contas
                     </Button>
                     <Button variant="ghost" size="sm" onClick={handleDisconnect}>
                       <Unlink className="mr-2 h-4 w-4" />
                       Desconectar
                     </Button>
+                    </div>
                   </div>
-                </div>
 
                 {/* Connected Accounts */}
                 <div>
@@ -125,22 +145,22 @@ export default function Integracoes() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {mockAccounts.map((account) => (
+                      {accounts.map((account: any) => (
                         <TableRow key={account.id}>
                           <TableCell className="font-medium">{account.name}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-sm">
-                            {account.accountId}
+                            {account.id}
                           </TableCell>
                           <TableCell>
                             <Badge
                               variant="outline"
                               className={
-                                account.status === 'ativo'
+                                String(account.status).toLowerCase().includes('active')
                                   ? 'bg-success/15 text-success border-success/30'
                                   : 'bg-warning/15 text-warning border-warning/30'
                               }
                             >
-                              {account.status === 'ativo' ? 'Ativo' : 'Pausado'}
+                              {String(account.status).toLowerCase().includes('active') ? 'Ativo' : 'Pausado'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">

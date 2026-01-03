@@ -1,4 +1,7 @@
-import { Link, useLocation } from 'react-router-dom';
+"use client";
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
@@ -16,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useSidebar } from '@/components/layout/SidebarContext';
+import { useAlertCount } from '@/hooks/use-alert-count';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -32,8 +36,9 @@ const secondaryNavigation = [
 ];
 
 export function MobileSidebar() {
-  const location = useLocation();
+  const pathname = usePathname();
   const { mobileOpen, setMobileOpen } = useSidebar();
+  const { data: alertCount = 0 } = useAlertCount();
 
   return (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -66,11 +71,11 @@ export function MobileSidebar() {
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-2 py-4">
             {navigation.map((item) => {
-              const isActive = location.pathname.startsWith(item.href);
+              const isActive = pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  href={item.href}
                   onClick={() => setMobileOpen(false)}
                   className={cn(
                     'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -81,12 +86,12 @@ export function MobileSidebar() {
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
                   <span className="flex-1">{item.name}</span>
-                  {item.badge && (
+                  {item.badge !== undefined && (
                     <Badge
                       variant="destructive"
                       className="h-5 min-w-5 justify-center px-1.5 text-xs"
                     >
-                      {item.badge}
+                      {item.name === 'Alertas' ? alertCount : item.badge}
                     </Badge>
                   )}
                 </Link>
@@ -97,11 +102,11 @@ export function MobileSidebar() {
           {/* Secondary Navigation */}
           <div className="border-t border-sidebar-border px-2 py-4">
             {secondaryNavigation.map((item) => {
-              const isActive = location.pathname.startsWith(item.href);
+              const isActive = pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  href={item.href}
                   onClick={() => setMobileOpen(false)}
                   className={cn(
                     'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',

@@ -1,5 +1,7 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+"use client";
+
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Building2,
@@ -23,6 +25,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -34,29 +45,54 @@ import { Textarea } from '@/components/ui/textarea';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { StatusBadge, ObjectiveBadge } from '@/components/shared/StatusBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
-import {
-  getClientById,
-  getAdAccountsByClient,
-  getCampaignsByClient,
-} from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 export default function ClienteDetalhes() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const params = useParams();
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
+  const router = useRouter();
   const [notes, setNotes] = useState('');
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [selectedAdAccount, setSelectedAdAccount] = useState('');
 
-  const client = getClientById(id || '');
-  const adAccounts = getAdAccountsByClient(id || '');
-  const campaigns = getCampaignsByClient(id || '');
+  const { data: client, isLoading, refetch: refetchClient } = useQuery({
+    queryKey: ['client', id],
+    queryFn: () => apiFetch<any>(`/api/clients/${id}`),
+    enabled: !!id,
+  });
 
-  if (!client) {
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['campaigns', id],
+    queryFn: () => apiFetch<any[]>(`/api/campaigns?clientId=${id}`),
+    enabled: !!id,
+  });
+
+  const { data: allAccounts = [], refetch: refetchAccounts } = useQuery({
+    queryKey: ['ad-accounts'],
+    queryFn: () => apiFetch<any[]>('/api/ad-accounts'),
+  });
+
+  const adAccounts = client?.adAccounts?.map((item: any) => item.adAccount) ?? [];
+  const linkedAccountIds = new Set(adAccounts.map((account: any) => account.id));
+  const availableAccounts = allAccounts.filter(
+    (account: any) => !linkedAccountIds.has(account.id),
+  );
+
+  useEffect(() => {
+    if (client?.notes) {
+      setNotes(client.notes);
+    }
+  }, [client?.notes]);
+
+  if (!client && !isLoading) {
     return (
       <AppLayout>
         <EmptyState
           icon={User}
           title="Cliente não encontrado"
           description="O cliente que você está procurando não existe ou foi removido."
-          action={{ label: 'Voltar para clientes', onClick: () => navigate('/clientes') }}
+          action={{ label: 'Voltar para clientes', onClick: () => router.push('/clientes') }}
         />
       </AppLayout>
     );
@@ -69,9 +105,58 @@ export default function ClienteDetalhes() {
     }).format(value);
   };
 
-  const totalGasto = adAccounts.reduce((acc, a) => acc + a.gastoMensal, 0);
-  const totalLeads = campaigns.reduce((acc, c) => acc + c.resultados, 0);
+  const totalGasto = adAccounts.reduce((acc: number, a: any) => acc + Number(a.spendCap ?? 0), 0);
+  const totalLeads = campaigns.reduce((acc: number, c: any) => acc + Number(c.leads ?? 0), 0);
   const avgCPL = totalLeads > 0 ? totalGasto / totalLeads : 0;
+
+  const handleSaveNotes = async () => {
+    if (!id) return;
+    await apiFetch(`/api/clients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ notes }),
+    });
+  };
+
+  const handleLinkAccount = async () => {
+    if (!id || !selectedAdAccount) return;
+    await apiFetch(`/api/clients/${id}/ad-accounts`, {
+      method: 'POST',
+      body: JSON.stringify({
+        adAccountIds: [selectedAdAccount],
+        primaryAdAccountId: selectedAdAccount,
+      }),
+    });
+    setLinkDialogOpen(false);
+    setSelectedAdAccount('');
+    await Promise.all([refetchAccounts(), refetchClient()]);
+  };
+
+  const mapObjective = (objective?: string) => {
+    if (!objective) return 'leads';
+    const normalized = objective.toLowerCase();
+    if (normalized.includes('conversion')) return 'conversoes';
+    if (normalized.includes('traffic')) return 'trafego';
+    if (normalized.includes('reach')) return 'alcance';
+    if (normalized.includes('engagement')) return 'engajamento';
+    return 'leads';
+  };
+
+  const mapCampaignStatus = (status?: string) => {
+    if (!status) return 'ativo';
+    const normalized = status.toLowerCase();
+    if (normalized.includes('paused')) return 'pausado';
+    if (normalized.includes('review')) return 'em_revisao';
+    if (normalized.includes('archived') || normalized.includes('completed')) return 'encerrado';
+    return 'ativo';
+  };
+
+  const mapAccountStatus = (status?: string) => {
+    if (!status) return 'ativo';
+    const normalized = status.toLowerCase();
+    if (normalized.includes('paused') || normalized === '2') return 'pausado';
+    if (normalized.includes('active') || normalized === '1') return 'ativo';
+    return 'erro';
+  };
 
   return (
     <AppLayout>
@@ -82,13 +167,13 @@ export default function ClienteDetalhes() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/clientes')}
+              onClick={() => router.push('/clientes')}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted">
-                {client.tipo === 'imobiliaria' ? (
+                {client.type === 'REAL_ESTATE' ? (
                   <Building2 className="h-6 w-6 text-muted-foreground" />
                 ) : (
                   <User className="h-6 w-6 text-muted-foreground" />
@@ -96,12 +181,20 @@ export default function ClienteDetalhes() {
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold tracking-tight">{client.nome}</h1>
-                  <StatusBadge status={client.status} />
+                  <h1 className="text-2xl font-bold tracking-tight">{client.name}</h1>
+                  <StatusBadge
+                    status={
+                      client.status === 'ACTIVE'
+                        ? 'ativo'
+                        : client.status === 'PAUSED'
+                        ? 'pausado'
+                        : 'arquivado'
+                    }
+                  />
                 </div>
                 <p className="text-muted-foreground">
-                  {client.tipo === 'imobiliaria' ? 'Imobiliária' : 'Corretor'} •{' '}
-                  {client.cidade}/{client.uf}
+                  {client.type === 'REAL_ESTATE' ? 'Imobiliária' : 'Corretor'} •{' '}
+                  {client.city}/{client.state}
                 </p>
               </div>
             </div>
@@ -124,15 +217,15 @@ export default function ClienteDetalhes() {
               {client.instagram}
             </div>
           )}
-          {client.site && (
+          {client.website && (
             <a
-              href={`https://${client.site}`}
+              href={client.website.startsWith('http') ? client.website : `https://${client.website}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm text-primary hover:underline"
             >
               <Globe className="h-4 w-4" />
-              {client.site}
+              {client.website}
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
@@ -172,13 +265,13 @@ export default function ClienteDetalhes() {
               />
             </div>
 
-            {client.observacoes && (
+            {client.notes && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Observações</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">{client.observacoes}</p>
+                  <p className="text-sm text-muted-foreground">{client.notes}</p>
                 </CardContent>
               </Card>
             )}
@@ -186,11 +279,46 @@ export default function ClienteDetalhes() {
 
           <TabsContent value="accounts">
             <Card>
-              <CardHeader>
-                <CardTitle>Contas de Anúncios</CardTitle>
-                <CardDescription>
-                  Contas conectadas via Meta/Facebook
-                </CardDescription>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Contas de Anúncios</CardTitle>
+                  <CardDescription>
+                    Contas conectadas via Meta/Facebook
+                  </CardDescription>
+                </div>
+                <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">Vincular conta</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Vincular conta</DialogTitle>
+                      <DialogDescription>
+                        Selecione uma conta para associar a este cliente.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Select
+                        value={selectedAdAccount}
+                        onValueChange={setSelectedAdAccount}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a conta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableAccounts.map((account: any) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button onClick={handleLinkAccount} disabled={!selectedAdAccount}>
+                        Vincular
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <CardContent>
                 {adAccounts.length === 0 ? (
@@ -200,7 +328,7 @@ export default function ClienteDetalhes() {
                     description="Conecte uma conta de anúncios Meta para começar a acompanhar as campanhas deste cliente."
                     action={{
                       label: 'Conectar conta',
-                      onClick: () => navigate('/integracoes'),
+                      onClick: () => router.push('/integracoes'),
                     }}
                   />
                 ) : (
@@ -215,20 +343,20 @@ export default function ClienteDetalhes() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {adAccounts.map((account) => (
+                      {adAccounts.map((account: any) => (
                         <TableRow key={account.id}>
-                          <TableCell className="font-medium">{account.nome}</TableCell>
+                          <TableCell className="font-medium">{account.name}</TableCell>
                           <TableCell>
                             <Badge variant="secondary">Meta</Badge>
                           </TableCell>
                           <TableCell>
-                            <StatusBadge status={account.status} />
+                            <StatusBadge status={mapAccountStatus(account.status)} />
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatCurrency(account.gastoMensal)}
+                            {formatCurrency(Number(account.spendCap ?? 0) / 100)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatCurrency(account.orcamento)}
+                            {formatCurrency(Number(account.spendCap ?? 0) / 100)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -260,21 +388,21 @@ export default function ClienteDetalhes() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {campaigns.map((campaign) => (
+                    {campaigns.map((campaign: any) => (
                       <TableRow key={campaign.id}>
-                        <TableCell className="font-medium">{campaign.nome}</TableCell>
+                        <TableCell className="font-medium">{campaign.name}</TableCell>
                         <TableCell>
-                          <ObjectiveBadge objective={campaign.objetivo} />
+                          <ObjectiveBadge objective={mapObjective(campaign.objective)} />
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={campaign.status} />
+                          <StatusBadge status={mapCampaignStatus(campaign.status)} />
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(campaign.gastoTotal)}
+                          {formatCurrency(Number(campaign.dailyBudget ?? 0) / 100)}
                         </TableCell>
-                        <TableCell className="text-right">{campaign.resultados}</TableCell>
+                        <TableCell className="text-right">{campaign.leads ?? 0}</TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(campaign.cpa)}
+                          {formatCurrency(Number(campaign.dailyBudget ?? 0) / 100)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -294,7 +422,9 @@ export default function ClienteDetalhes() {
                   <div className="flex items-center justify-between p-4 rounded-lg bg-muted">
                     <div>
                       <p className="text-sm text-muted-foreground">Valor Mensal</p>
-                      <p className="text-2xl font-bold">{formatCurrency(client.valorMensal)}</p>
+                      <p className="text-2xl font-bold">
+                        {formatCurrency(client.monthlyFee / 100)}
+                      </p>
                     </div>
                     <Badge variant="secondary" className="bg-success/15 text-success border-success/30">
                       Em dia
@@ -320,7 +450,7 @@ export default function ClienteDetalhes() {
                     <TableBody>
                       <TableRow>
                         <TableCell>Dezembro 2024</TableCell>
-                        <TableCell>{formatCurrency(client.valorMensal)}</TableCell>
+                        <TableCell>{formatCurrency(client.monthlyFee / 100)}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-success/15 text-success">
                             Pago
@@ -330,7 +460,7 @@ export default function ClienteDetalhes() {
                       </TableRow>
                       <TableRow>
                         <TableCell>Novembro 2024</TableCell>
-                        <TableCell>{formatCurrency(client.valorMensal)}</TableCell>
+                        <TableCell>{formatCurrency(client.monthlyFee / 100)}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-success/15 text-success">
                             Pago
@@ -360,7 +490,7 @@ export default function ClienteDetalhes() {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={6}
                 />
-                <Button>Salvar Notas</Button>
+                <Button onClick={handleSaveNotes}>Salvar Notas</Button>
               </CardContent>
             </Card>
           </TabsContent>

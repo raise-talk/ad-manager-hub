@@ -1,5 +1,9 @@
+"use client";
+
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Zap, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Cadastro() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -36,8 +40,34 @@ export default function Cadastro() {
 
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      navigate('/dashboard');
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.nome,
+            email: formData.email,
+            password: formData.senha,
+          }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          setErrors({ email: data.error ?? 'Erro ao cadastrar' });
+          setIsLoading(false);
+          return;
+        }
+
+        await signIn('credentials', {
+          email: formData.email,
+          password: formData.senha,
+          redirect: false,
+        });
+
+        router.push('/dashboard');
+      } catch (error) {
+        setErrors({ email: 'Erro ao cadastrar. Tente novamente.' });
+      }
       setIsLoading(false);
     }
   };
@@ -152,7 +182,7 @@ export default function Cadastro() {
 
             <div className="mt-6 text-center text-sm text-muted-foreground">
               Já tem uma conta?{' '}
-              <Link to="/login" className="text-primary hover:underline font-medium">
+              <Link href="/login" className="text-primary hover:underline font-medium">
                 Fazer login
               </Link>
             </div>

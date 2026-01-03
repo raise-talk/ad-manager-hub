@@ -1,4 +1,7 @@
-import { useState } from 'react';
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   User,
   Bell,
@@ -23,12 +26,15 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { mockUser } from '@/data/mockData';
+import { apiFetch } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 
 export default function Configuracoes() {
+  const { data: session } = useSession();
   const [profile, setProfile] = useState({
-    nome: mockUser.nome,
-    email: mockUser.email,
+    nome: '',
+    email: '',
+    senha: '',
   });
   const [preferences, setPreferences] = useState({
     timezone: 'America/Sao_Paulo',
@@ -41,9 +47,106 @@ export default function Configuracoes() {
     marketing: false,
   });
   const [business, setBusiness] = useState({
-    nomeServico: mockUser.nomeServico,
+    nomeServico: 'TrafegoAds',
     metaPadrao: '10000',
   });
+
+  const { data: notificationSettings } = useQuery({
+    queryKey: ['settings', 'notifications'],
+    queryFn: () => apiFetch<any>('/api/settings/notifications'),
+  });
+
+  const { data: businessSettings } = useQuery({
+    queryKey: ['settings', 'business'],
+    queryFn: () => apiFetch<any>('/api/settings/business'),
+  });
+
+  const handleSaveProfile = async () => {
+    await apiFetch('/api/settings/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: profile.nome,
+        email: profile.email,
+        password: profile.senha || undefined,
+      }),
+    });
+    setProfile((prev) => ({ ...prev, senha: '' }));
+  };
+
+  const handleSavePreferences = async () => {
+    await apiFetch('/api/settings/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({
+        timezone: preferences.timezone,
+        currency: preferences.moeda,
+      }),
+    });
+  };
+
+  const handleSaveNotifications = async () => {
+    await apiFetch('/api/settings/notifications', {
+      method: 'PUT',
+      body: JSON.stringify({
+        notifyAlerts: notifications.alertas,
+        notifyReports: notifications.relatorios,
+        notifyMarketing: notifications.marketing,
+      }),
+    });
+  };
+
+  const handleSaveBusiness = async () => {
+    await apiFetch('/api/settings/business', {
+      method: 'PUT',
+      body: JSON.stringify({
+        serviceName: business.nomeServico,
+        defaultGoal: Number(business.metaPadrao),
+      }),
+    });
+  };
+
+  const { data: storedPreferences } = useQuery({
+    queryKey: ['preferences'],
+    queryFn: () => apiFetch<any>('/api/settings/preferences'),
+  });
+
+  useEffect(() => {
+    if (session?.user) {
+      setProfile((prev) => ({
+        ...prev,
+        nome: session.user.name ?? '',
+        email: session.user.email ?? '',
+      }));
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (storedPreferences) {
+      setPreferences((prev) => ({
+        ...prev,
+        timezone: storedPreferences.timezone ?? prev.timezone,
+        moeda: storedPreferences.currency ?? prev.moeda,
+      }));
+    }
+  }, [storedPreferences]);
+
+  useEffect(() => {
+    if (notificationSettings) {
+      setNotifications({
+        alertas: notificationSettings.notifyAlerts ?? true,
+        relatorios: notificationSettings.notifyReports ?? true,
+        marketing: notificationSettings.notifyMarketing ?? false,
+      });
+    }
+  }, [notificationSettings]);
+
+  useEffect(() => {
+    if (businessSettings) {
+      setBusiness({
+        nomeServico: businessSettings.serviceName ?? 'TrafegoAds',
+        metaPadrao: String(businessSettings.defaultGoal ?? 0),
+      });
+    }
+  }, [businessSettings]);
 
   return (
     <AppLayout>
@@ -105,15 +208,15 @@ export default function Configuracoes() {
                 <Separator />
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Nome completo</Label>
-                    <Input
-                      value={profile.nome}
-                      onChange={(e) =>
-                        setProfile({ ...profile, nome: e.target.value })
-                      }
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label>Nome completo</Label>
+                      <Input
+                        value={profile.nome}
+                        onChange={(e) =>
+                          setProfile({ ...profile, nome: e.target.value })
+                        }
+                      />
+                    </div>
                   <div className="space-y-2">
                     <Label>Email</Label>
                     <Input
@@ -132,18 +235,21 @@ export default function Configuracoes() {
                   <h3 className="text-sm font-medium">Alterar Senha</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Senha atual</Label>
-                      <Input type="password" placeholder="••••••••" />
-                    </div>
-                    <div className="space-y-2">
                       <Label>Nova senha</Label>
-                      <Input type="password" placeholder="••••••••" />
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        value={profile.senha}
+                        onChange={(e) =>
+                          setProfile({ ...profile, senha: e.target.value })
+                        }
+                      />
                     </div>
                   </div>
                 </div>
 
                 <div className="flex justify-end">
-                  <Button>
+                  <Button onClick={handleSaveProfile}>
                     <Save className="mr-2 h-4 w-4" />
                     Salvar Alterações
                   </Button>
@@ -227,7 +333,7 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button>
+                  <Button onClick={handleSavePreferences}>
                     <Save className="mr-2 h-4 w-4" />
                     Salvar Preferências
                   </Button>
@@ -297,7 +403,7 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button>
+                  <Button onClick={handleSaveNotifications}>
                     <Save className="mr-2 h-4 w-4" />
                     Salvar Notificações
                   </Button>
@@ -363,7 +469,7 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button>
+                  <Button onClick={handleSaveBusiness}>
                     <Save className="mr-2 h-4 w-4" />
                     Salvar Dados
                   </Button>

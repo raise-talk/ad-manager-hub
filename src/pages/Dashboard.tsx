@@ -1,4 +1,6 @@
-import { useState } from 'react';
+"use client";
+
+import { useMemo, useState } from 'react';
 import { DollarSign, Users, Target, TrendingUp, RefreshCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,17 +27,34 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import {
-  mockKPIs,
-  mockGastoTimeline,
-  mockClients,
-  mockAdAccounts,
-  getClientById,
-} from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 export default function Dashboard() {
   const [selectedClient, setSelectedClient] = useState<string>('all');
   const [dateRange, setDateRange] = useState('30d');
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => apiFetch<any[]>('/api/clients'),
+  });
+
+  const { data: dashboard, refetch, isFetching } = useQuery({
+    queryKey: ['dashboard', selectedClient, dateRange],
+    queryFn: () => {
+      const days = dateRange === '7d' ? 7 : dateRange === '90d' ? 90 : 30;
+      const to = new Date();
+      const from = new Date();
+      from.setDate(to.getDate() - days);
+      const params = new URLSearchParams({
+        from: from.toISOString(),
+        to: to.toISOString(),
+      });
+      if (selectedClient !== 'all') {
+        params.set('clientId', selectedClient);
+      }
+      return apiFetch<any>(`/api/dashboard?${params.toString()}`);
+    },
+  });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -44,12 +63,22 @@ export default function Dashboard() {
     }).format(value);
   };
 
-  const topAccounts = mockAdAccounts
-    .filter(acc => selectedClient === 'all' || acc.clientId === selectedClient)
-    .map(acc => ({
-      ...acc,
-      cliente: getClientById(acc.clientId),
-    }));
+  const mapStatus = (status: string) => {
+    const normalized = String(status).toLowerCase();
+    if (normalized.includes('active') || normalized === '1') return 'ativo';
+    if (normalized.includes('paused') || normalized === '2') return 'pausado';
+    return 'erro';
+  };
+
+  const topAccounts = useMemo(() => dashboard?.highlights ?? [], [dashboard]);
+  const timeline = useMemo(() => dashboard?.timeline ?? [], [dashboard]);
+  const kpis = dashboard?.kpis ?? {
+    gastoMes: 0,
+    leadsMes: 0,
+    cpl: 0,
+    roas: 0,
+    clientesAtivos: 0,
+  };
 
   return (
     <AppLayout>
@@ -69,9 +98,9 @@ export default function Dashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os clientes</SelectItem>
-                {mockClients.map((client) => (
+                {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.nome}
+                    {client.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -86,8 +115,8 @@ export default function Dashboard() {
                 <SelectItem value="90d">Últimos 90 dias</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
-              <RefreshCcw className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCcw className={isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             </Button>
           </div>
         </div>
@@ -96,31 +125,31 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <KPICard
             title="Gasto no Mês"
-            value={formatCurrency(mockKPIs.gastoMes)}
+            value={formatCurrency(kpis.gastoMes)}
             icon={DollarSign}
             change={{ value: 12.5, trend: 'up' }}
           />
           <KPICard
             title="Leads (Mês)"
-            value={mockKPIs.leadsMes.toLocaleString('pt-BR')}
+            value={kpis.leadsMes.toLocaleString('pt-BR')}
             icon={Target}
             change={{ value: 8.2, trend: 'up' }}
           />
           <KPICard
             title="CPL Médio"
-            value={formatCurrency(mockKPIs.cpl)}
+            value={formatCurrency(kpis.cpl)}
             icon={TrendingUp}
             change={{ value: -5.3, trend: 'down' }}
           />
           <KPICard
             title="ROAS"
-            value={`${mockKPIs.roas.toFixed(1)}x`}
+            value={`${kpis.roas.toFixed(1)}x`}
             icon={TrendingUp}
             change={{ value: 2.1, trend: 'up' }}
           />
           <KPICard
             title="Clientes Ativos"
-            value={mockKPIs.clientesAtivos}
+            value={kpis.clientesAtivos}
             icon={Users}
             subtitle="de 4 cadastrados"
           />
@@ -135,7 +164,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={mockGastoTimeline}>
+                <LineChart data={timeline}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis
                     dataKey="date"
@@ -195,11 +224,11 @@ export default function Dashboard() {
                 {topAccounts.map((account) => (
                   <TableRow key={account.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium">
-                      {account.cliente?.nome}
+                      {account.cliente}
                     </TableCell>
                     <TableCell>{account.nome}</TableCell>
                     <TableCell>
-                      <StatusBadge status={account.status} />
+                      <StatusBadge status={mapStatus(account.status)} />
                     </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(account.gastoMensal)}
@@ -208,7 +237,7 @@ export default function Dashboard() {
                       {formatCurrency(account.orcamento)}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
-                      {format(account.ultimaAtualizacao, "dd/MM 'às' HH:mm", { locale: ptBR })}
+                      {format(new Date(account.ultimaAtualizacao), "dd/MM 'às' HH:mm", { locale: ptBR })}
                     </TableCell>
                   </TableRow>
                 ))}

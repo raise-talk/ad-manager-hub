@@ -60,6 +60,43 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Backend + banco de dados (MVP)
+
+Este projeto inclui um schema Prisma e seed para dados iniciais (admin + clientes + contas + métricas).
+
+### Variáveis de ambiente
+
+Copie `.env.example` para `.env` e ajuste conforme necessário:
+
+```sh
+cp .env.example .env
+```
+
+### Subir o PostgreSQL via Docker
+
+```sh
+docker compose up -d
+```
+
+### Aplicar migrações e seed
+
+```sh
+npm install
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+### Rodar a aplicação localmente (fora do Docker)
+
+```sh
+npm run dev
+```
+
+### Credenciais do seed
+
+- Email: `admin@example.com`
+- Senha: `admin123`
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.

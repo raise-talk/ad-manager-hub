@@ -22,31 +22,51 @@ export async function POST(
   }
 
   const { adAccountIds, primaryAdAccountId } = parsed.data;
+  if (primaryAdAccountId && !adAccountIds.includes(primaryAdAccountId)) {
+    return NextResponse.json(
+      { error: "primaryAdAccountId deve estar na lista de adAccountIds" },
+      { status: 400 },
+    );
+  }
 
-  await prisma.clientAdAccount.createMany({
-    data: adAccountIds.map((adAccountId) => ({
-      clientId: params.id,
-      adAccountId,
-      isPrimary: primaryAdAccountId === adAccountId,
-    })),
-    skipDuplicates: true,
+  const existingAccounts = await prisma.adAccount.findMany({
+    where: { id: { in: adAccountIds } },
+    select: { id: true },
   });
 
-  if (primaryAdAccountId) {
-    await prisma.clientAdAccount.updateMany({
-      where: { clientId: params.id },
-      data: { isPrimary: false },
-    });
-    await prisma.clientAdAccount.update({
-      where: {
-        clientId_adAccountId: {
-          clientId: params.id,
-          adAccountId: primaryAdAccountId,
-        },
-      },
-      data: { isPrimary: true },
-    });
+  if (existingAccounts.length !== adAccountIds.length) {
+    return NextResponse.json(
+      { error: "Uma ou mais contas de anuncio nao foram encontradas" },
+      { status: 400 },
+    );
   }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.clientAdAccount.createMany({
+      data: adAccountIds.map((adAccountId) => ({
+        clientId: params.id,
+        adAccountId,
+        isPrimary: primaryAdAccountId === adAccountId,
+      })),
+      skipDuplicates: true,
+    });
+
+    if (primaryAdAccountId) {
+      await tx.clientAdAccount.updateMany({
+        where: { clientId: params.id },
+        data: { isPrimary: false },
+      });
+      await tx.clientAdAccount.update({
+        where: {
+          clientId_adAccountId: {
+            clientId: params.id,
+            adAccountId: primaryAdAccountId,
+          },
+        },
+        data: { isPrimary: true },
+      });
+    }
+  });
 
   return NextResponse.json({ success: true });
 }

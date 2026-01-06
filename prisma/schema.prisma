@@ -56,6 +56,9 @@ model User {
   passwordHash String
   timezone     String            @default("America/Sao_Paulo")
   currency     String            @default("BRL")
+  profileImage String?
+  businessName String?
+  businessLogo String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   metaIntegration MetaIntegration?
@@ -109,12 +112,25 @@ model Client {
   instagram    String?
   website      String?
   monthlyFee   Int
+  dueDay       Int?             // dia de vencimento (1-31)
+  lastPaymentAt DateTime?
   status       ClientStatus     @default(ACTIVE)
   notes        String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   adAccounts   ClientAdAccount[]
+  payments     Payment[]
   alerts       Alert[]
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  clientId  String
+  amount    Int
+  paidAt    DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model MetaIntegration {

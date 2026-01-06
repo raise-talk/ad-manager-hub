@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useSidebar } from '@/components/layout/SidebarContext';
 import { useAlertCount } from '@/hooks/use-alert-count';
+import { useBranding } from '@/hooks/use-branding';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -39,6 +40,7 @@ export function MobileSidebar() {
   const pathname = usePathname();
   const { mobileOpen, setMobileOpen } = useSidebar();
   const { data: alertCount = 0 } = useAlertCount();
+  const { brandName } = useBranding();
 
   return (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -55,7 +57,7 @@ export function MobileSidebar() {
                 <Zap className="h-4 w-4 text-primary-foreground" />
               </div>
               <span className="font-semibold text-sidebar-foreground">
-                TrafegoAds
+                {brandName}
               </span>
             </Link>
             <Button

@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useBranding } from '@/hooks/use-branding';
 
 export default function Login() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { brandName } = useBranding();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -34,15 +36,16 @@ export default function Login() {
       email,
       password,
       redirect: false,
+      callbackUrl,
     });
 
-    if (!result?.ok) {
-      setError('Email ou senha inválidos.');
+    if (!result?.ok || result.error) {
+      setError(result?.error === 'CredentialsSignin' ? 'Email ou senha inválidos.' : 'Não foi possível entrar.');
       setIsLoading(false);
       return;
     }
 
-    router.push(callbackUrl);
+    router.push(result.url ?? callbackUrl);
     setIsLoading(false);
   };
 
@@ -57,7 +60,7 @@ export default function Login() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold">TrafegoAds</span>
+          <span className="text-xl font-bold">{brandName}</span>
         </div>
 
         <Card className="border-0 shadow-xl">

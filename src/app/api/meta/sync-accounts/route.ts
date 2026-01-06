@@ -3,6 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/require-auth";
 import { fetchAdAccounts, getStoredAccessToken } from "@/server/meta";
 
+const mapAccountStatus = (status: string | number | null | undefined) => {
+  const value = typeof status === "number" ? status : Number(status);
+  if (value === 1) return "ACTIVE";
+  if ([2, 3, 7, 8, 9, 101, 201].includes(value)) return "PAUSED";
+  return "UNKNOWN";
+};
+
 export async function POST() {
   const { response, session } = await requireAuth();
   if (response) {
@@ -28,7 +35,7 @@ export async function POST() {
           name: account.name,
           currency: account.currency,
           timezone: account.timezone_name,
-          status: String(account.account_status),
+          status: mapAccountStatus(account.account_status),
           spendCap: account.spend_cap ? BigInt(account.spend_cap) : undefined,
         },
         create: {
@@ -36,7 +43,7 @@ export async function POST() {
           name: account.name,
           currency: account.currency,
           timezone: account.timezone_name,
-          status: String(account.account_status),
+          status: mapAccountStatus(account.account_status),
           spendCap: account.spend_cap ? BigInt(account.spend_cap) : undefined,
         },
       }),

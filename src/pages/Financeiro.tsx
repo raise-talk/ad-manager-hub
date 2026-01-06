@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   DollarSign,
   Users,
@@ -43,6 +45,30 @@ import { Badge } from '@/components/ui/badge';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+
+type FinanceSummary = {
+  mrr: number;
+  clientesAtivos: number;
+  ticketMedio: number;
+  progressClients: number;
+  progressRevenue: number;
+};
+
+type Goal = {
+  targetClients: number;
+  targetRevenue: number;
+};
+
+type FinanceClient = {
+  id: string;
+  name: string;
+  monthlyFee: number;
+  status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  dueDay?: number | null;
+  lastPaymentAt?: string | null;
+  paidThisMonth?: boolean;
+};
 
 export default function Financeiro() {
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
@@ -54,19 +80,19 @@ export default function Financeiro() {
   const month = new Date().getMonth() + 1;
   const year = new Date().getFullYear();
 
-  const { data: finance } = useQuery({
+  const { data: finance, isLoading: financeLoading } = useQuery<FinanceSummary>({
     queryKey: ['finance', month, year],
-    queryFn: () => apiFetch<any>(`/api/finance/summary?month=${month}&year=${year}`),
+    queryFn: () => apiFetch<FinanceSummary>(`/api/finance/summary?month=${month}&year=${year}`),
   });
 
-  const { data: goal, refetch } = useQuery({
+  const { data: goal, refetch, isLoading: goalLoading } = useQuery<Goal>({
     queryKey: ['goals', month, year],
-    queryFn: () => apiFetch<any>(`/api/goals?month=${month}&year=${year}`),
+    queryFn: () => apiFetch<Goal>(`/api/goals?month=${month}&year=${year}`),
   });
 
-  const { data: clients = [] } = useQuery({
+  const { data: clients = [], isLoading: clientsLoading } = useQuery<FinanceClient[]>({
     queryKey: ['clients'],
-    queryFn: () => apiFetch<any[]>('/api/clients'),
+    queryFn: () => apiFetch<FinanceClient[]>('/api/clients'),
   });
 
   const formatCurrency = (value: number) => {
@@ -83,15 +109,80 @@ export default function Financeiro() {
   const progressReceita = Math.round((finance?.progressRevenue ?? 0) * 100);
 
   const receitaMensal = useMemo(() => {
-    return Array.from({ length: 6 }).map((_, index) => {
+    const months = Array.from({ length: 6 }).map((_, index) => {
       const date = new Date();
       date.setMonth(date.getMonth() - (5 - index));
       return {
-        date: date.toLocaleDateString('pt-BR', { month: 'short' }),
-        value: mrr,
+        key: `${date.getFullYear()}-${date.getMonth() + 1}`,
+        label: date.toLocaleDateString('pt-BR', { month: 'short' }),
+        value: 0,
       };
     });
-  }, [mrr]);
+    // Distribui pagamentos por mês
+    clients.forEach((client) => {
+      if (client.lastPaymentAt) {
+        const paidDate = new Date(client.lastPaymentAt);
+        const key = `${paidDate.getFullYear()}-${paidDate.getMonth() + 1}`;
+        const bucket = months.find((m) => m.key === key);
+        if (bucket) {
+          bucket.value += client.monthlyFee;
+        }
+      }
+    });
+    return months;
+  }, [clients]);
+
+  const computePaymentStatus = (client: FinanceClient) => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const lastPaid = client.lastPaymentAt ? new Date(client.lastPaymentAt) : null;
+    const paidThisMonth =
+      client.paidThisMonth !== undefined
+        ? client.paidThisMonth
+        : !!(
+            lastPaid &&
+            lastPaid.getMonth() === currentMonth &&
+            lastPaid.getFullYear() === currentYear
+          );
+
+    const dueDay = client.dueDay ?? null;
+    if (!dueDay) {
+      return { label: paidThisMonth ? 'Em dia' : 'Pendente', variant: paidThisMonth ? 'secondary' : 'outline', dueDate: null };
+    }
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const dueDate = new Date(currentYear, currentMonth, Math.min(dueDay, daysInMonth));
+    if (paidThisMonth) {
+      return { label: 'Em dia', variant: 'secondary' as const, dueDate };
+    }
+    if (today > dueDate) {
+      return { label: 'Atrasado', variant: 'destructive' as const, dueDate };
+    }
+    return { label: 'Pendente', variant: 'outline' as const, dueDate };
+  };
+
+  const formatDueDate = (dueDay?: number | null) => {
+    if (!dueDay) return 'N/A';
+    const today = new Date();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const target = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      Math.min(dueDay, daysInMonth)
+    );
+    if (today > target) {
+      // next month
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const nextDays = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+      const nextTarget = new Date(
+        nextMonth.getFullYear(),
+        nextMonth.getMonth(),
+        Math.min(dueDay, nextDays)
+      );
+      return format(nextTarget, 'dd/MM/yyyy', { locale: ptBR });
+    }
+    return format(target, 'dd/MM/yyyy', { locale: ptBR });
+  };
 
   const handleSaveGoal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,17 +220,20 @@ export default function Financeiro() {
             value={formatCurrency(mrr / 100)}
             icon={DollarSign}
             change={{ value: 8.5, trend: 'up' }}
+            loading={financeLoading}
           />
           <KPICard
             title="Clientes Ativos"
             value={clientesAtivos}
             icon={Users}
             subtitle="total ativo"
+            loading={financeLoading}
           />
           <KPICard
             title="Ticket Médio"
             value={formatCurrency(ticketMedio / 100)}
             icon={TrendingUp}
+            loading={financeLoading}
           />
           <KPICard
             title="Meta do Mês"
@@ -150,6 +244,7 @@ export default function Financeiro() {
                 ? `${formatCurrency(mrr / 100)} / ${formatCurrency(goal.targetRevenue / 100)}`
                 : 'Sem meta'
             }
+            loading={financeLoading || goalLoading}
           />
         </div>
 
@@ -162,36 +257,40 @@ export default function Financeiro() {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={receitaMensal}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                      formatter={(value: number) => [formatCurrency(value), 'Receita']}
-                    />
-                    <Bar
-                      dataKey="value"
-                      fill="hsl(var(--primary))"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {financeLoading ? (
+                  <Skeleton className="h-full w-full" />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={receitaMensal}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 12 }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12 }}
+                        tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number) => [formatCurrency(value), 'Receita']}
+                      />
+                      <Bar
+                        dataKey="value"
+                        fill="hsl(var(--primary))"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -257,7 +356,13 @@ export default function Financeiro() {
               </Dialog>
             </CardHeader>
             <CardContent className="space-y-6">
-              {goal ? (
+              {goalLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-4 w-4/6" />
+                </div>
+              ) : goal ? (
                 <>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -312,27 +417,53 @@ export default function Financeiro() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clients
-                  .filter((client: any) => client.status !== 'ARCHIVED')
-                  .map((client: any) => (
-                    <TableRow key={client.id}>
-                      <TableCell className="font-medium">{client.name}</TableCell>
-                      <TableCell>{formatCurrency(client.monthlyFee / 100)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            client.status === 'ACTIVE'
-                              ? 'bg-success/15 text-success border-success/30'
-                              : 'bg-warning/15 text-warning border-warning/30'
-                          }
-                        >
-                          {client.status === 'ACTIVE' ? 'Em dia' : 'Pausado'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>05/01/2025</TableCell>
+                {clientsLoading &&
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <TableRow key={`finance-skel-${idx}`}>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     </TableRow>
                   ))}
+
+                {!clientsLoading &&
+                  clients
+                    .filter((client) => client.status !== 'ARCHIVED')
+                    .map((client) => {
+                      const paymentStatus = computePaymentStatus(client);
+                      const badgeClass =
+                        paymentStatus.label === 'Em dia'
+                          ? 'bg-success/15 text-success border-success/30'
+                          : paymentStatus.label === 'Atrasado'
+                            ? 'bg-destructive/15 text-destructive border-destructive/30'
+                            : 'bg-warning/15 text-warning border-warning/30';
+                      const nextDue =
+                        paymentStatus.dueDate
+                          ? format(paymentStatus.dueDate, 'dd/MM/yyyy', { locale: ptBR })
+                          : formatDueDate(client.dueDay);
+
+                      return (
+                        <TableRow key={client.id}>
+                          <TableCell className="font-medium">{client.name}</TableCell>
+                          <TableCell>{formatCurrency(client.monthlyFee / 100)}</TableCell>
+                          <TableCell>
+                            <Badge variant={paymentStatus.variant} className={badgeClass}>
+                              {paymentStatus.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{nextDue}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+
+                {!clientsLoading && clients.filter((client) => client.status !== 'ARCHIVED').length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                      Nenhum cliente ativo encontrado.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -341,3 +472,4 @@ export default function Financeiro() {
     </AppLayout>
   );
 }
+

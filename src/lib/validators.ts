@@ -20,8 +20,15 @@ export const clientSchema = z.object({
   instagram: z.string().optional(),
   website: z.string().optional(),
   monthlyFee: z.number().int().nonnegative(),
+  dueDay: z.number().int().min(1).max(31).optional(),
+  lastPaymentAt: z.string().datetime().optional(),
   status: z.enum(["ACTIVE", "PAUSED", "ARCHIVED"]).optional(),
   notes: z.string().optional(),
+});
+
+export const paymentSchema = z.object({
+  amount: z.number().int().nonnegative(),
+  paidAt: z.string().datetime().optional(),
 });
 
 export const goalSchema = z.object({
@@ -45,9 +52,23 @@ export const profileSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(6).optional(),
+  profileImage: z
+    .string()
+    .url()
+    .or(z.string().startsWith("data:image/"))
+    .optional(),
 });
 
 export const preferencesSchema = z.object({
   timezone: z.string().min(1),
   currency: z.string().min(1),
+});
+
+export const businessSchema = z.object({
+  name: z.string().min(1),
+  logo: z
+    .string()
+    .url()
+    .or(z.string().startsWith("data:image/"))
+    .optional(),
 });

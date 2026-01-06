@@ -11,6 +11,10 @@ import {
   Eye,
   CheckCircle,
   Settings,
+  Loader2,
+  Pause,
+  Play,
+  ExternalLink,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -34,6 +38,22 @@ import { Switch } from '@/components/ui/switch';
 import type { Alert, AlertSeverity } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/sonner';
+
+type AlertConfig = {
+  budgetLowThreshold: number;
+  enabled: boolean;
+};
+
+type AlertItem = Alert & {
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  status: 'NEW' | 'READ' | 'RESOLVED';
+  adAccount?: { name?: string; id?: string };
+  client?: { name?: string };
+  campaign?: { id: string; name?: string; status?: string | null; adAccountId?: string | null };
+  createdAt: string;
+};
 
 export default function Alertas() {
   const router = useRouter();
@@ -42,10 +62,11 @@ export default function Alertas() {
   const [activeTab, setActiveTab] = useState('feed');
   const [threshold, setThreshold] = useState(0);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
-  const { data: alertConfig, refetch: refetchConfig } = useQuery({
+  const { data: alertConfig, refetch: refetchConfig, isLoading: configLoading } = useQuery<AlertConfig>({
     queryKey: ['alerts', 'config'],
-    queryFn: () => apiFetch<any>('/api/alerts/config'),
+    queryFn: () => apiFetch<AlertConfig>('/api/alerts/config'),
   });
 
   useEffect(() => {
@@ -55,7 +76,7 @@ export default function Alertas() {
     }
   }, [alertConfig]);
 
-  const { data: alerts = [], refetch } = useQuery({
+  const { data: alerts = [], refetch, isLoading } = useQuery<AlertItem[]>({
     queryKey: ['alerts', statusFilter, severityFilter],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -63,7 +84,7 @@ export default function Alertas() {
         const mapped = statusFilter === 'novo' ? 'NEW' : statusFilter === 'lido' ? 'READ' : 'RESOLVED';
         params.set('status', mapped);
       }
-      return apiFetch<any[]>(`/api/alerts?${params.toString()}`);
+      return apiFetch<AlertItem[]>(`/api/alerts?${params.toString()}`);
     },
   });
 
@@ -106,6 +127,36 @@ export default function Alertas() {
       ),
     );
     await refetch();
+  };
+
+  const handleToggleCampaignStatus = async (alert: AlertItem) => {
+    if (!alert.campaign?.id) return;
+    try {
+      setActioningId(alert.id);
+      const current = String(alert.campaign.status ?? '').toUpperCase();
+      const next = current.includes('PAUSED') ? 'ACTIVE' : 'PAUSED';
+      await apiFetch(`/api/campaigns/${alert.campaign.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: next }),
+      });
+      toast.success(next === 'ACTIVE' ? 'Campanha reativada' : 'Campanha pausada');
+      await refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível atualizar a campanha');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleOpenMeta = (alert: AlertItem) => {
+    if (!alert.campaign?.id) return;
+    const ad = alert.campaign.adAccountId ?? alert.adAccount?.id ?? '';
+    const actId = ad ? (ad.startsWith('act_') ? ad : `act_${ad}`) : '';
+    const url = actId
+      ? `https://www.facebook.com/adsmanager/manage/campaigns?act=${actId}&selected_campaign_ids=${alert.campaign.id}`
+      : `https://www.facebook.com/adsmanager/manage/campaigns`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -171,7 +222,27 @@ export default function Alertas() {
 
             {/* Alerts List */}
             <div className="space-y-3">
-              {filteredAlerts.length === 0 ? (
+              {isLoading &&
+                Array.from({ length: 3 }).map((_, idx) => (
+                  <Card key={`alert-skel-${idx}`}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-4">
+                        <Skeleton className="h-10 w-10 rounded-lg" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-40" />
+                          <Skeleton className="h-3 w-3/4" />
+                          <div className="flex gap-2">
+                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                        </div>
+                        <Skeleton className="h-8 w-20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+              {!isLoading && filteredAlerts.length === 0 && (
                 <Card>
                   <CardContent className="py-12">
                     <EmptyState
@@ -181,7 +252,9 @@ export default function Alertas() {
                     />
                   </CardContent>
                 </Card>
-              ) : (
+              )}
+
+              {!isLoading &&
                 filteredAlerts.map((alert) => {
                   const severity = mapSeverity(alert.severity);
                   const status = mapStatus(alert.status);
@@ -234,6 +307,35 @@ export default function Alertas() {
                             </div>
                           </div>
                           <div className="flex flex-col gap-2">
+                            {alert.campaign?.id && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenMeta(alert)}
+                                >
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Ver na Meta
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={actioningId === alert.id}
+                                  onClick={() => handleToggleCampaignStatus(alert)}
+                                >
+                                  {actioningId === alert.id ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : mapStatus(alert.campaign?.status) === 'pausado' ? (
+                                    <Play className="mr-2 h-4 w-4" />
+                                  ) : (
+                                    <Pause className="mr-2 h-4 w-4" />
+                                  )}
+                                  {mapStatus(alert.campaign?.status) === 'pausado'
+                                    ? 'Reativar'
+                                    : 'Pausar'}
+                                </Button>
+                              </>
+                            )}
                             {alert.status === 'NEW' && (
                               <Button
                                 variant="outline"
@@ -272,8 +374,7 @@ export default function Alertas() {
                       </CardContent>
                     </Card>
                   );
-                })
-              )}
+                })}
             </div>
           </TabsContent>
 
@@ -287,18 +388,26 @@ export default function Alertas() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Limite de orçamento baixo (R$)</Label>
-                    <Input
-                      type="number"
-                      value={threshold}
-                      min={0}
-                      onChange={(event) => setThreshold(Number(event.target.value))}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Alertas são gerados quando o orçamento diário estiver abaixo deste valor.
-                    </p>
-                  </div>
+                  {configLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Limite de orçamento baixo (R$)</Label>
+                      <Input
+                        type="number"
+                        value={threshold}
+                        min={0}
+                        onChange={(event) => setThreshold(Number(event.target.value))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Alertas são gerados quando o orçamento diário estiver abaixo deste valor.
+                      </p>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>Alertas ativos</Label>

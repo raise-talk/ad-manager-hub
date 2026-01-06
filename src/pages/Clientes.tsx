@@ -51,15 +51,33 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import type { Client, ClientType, ClientStatus } from '@/types';
+import type { ClientType, ClientStatus } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+
+type ClientRow = {
+  id: string;
+  type: 'BROKER' | 'REAL_ESTATE';
+  name: string;
+  city: string;
+  state: string;
+  whatsapp?: string | null;
+  website?: string | null;
+  instagram?: string | null;
+  monthlyFee: number;
+  dueDay?: number | null;
+  notes?: string | null;
+  status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  updatedAt: string;
+};
 
 export default function Clientes() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     tipo: 'corretor' as ClientType,
     nome: '',
@@ -69,6 +87,7 @@ export default function Clientes() {
     instagram: '',
     site: '',
     valorMensal: '',
+    vencimento: '',
     status: 'ativo' as ClientStatus,
     observacoes: '',
   });
@@ -80,7 +99,7 @@ export default function Clientes() {
     }).format(value);
   };
 
-  const { data: clients = [], refetch } = useQuery({
+  const { data: clients = [], refetch, isLoading } = useQuery<ClientRow[]>({
     queryKey: ['clients', statusFilter, searchQuery],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -94,34 +113,46 @@ export default function Clientes() {
         params.set('status', mapped);
       }
       if (searchQuery) params.set('search', searchQuery);
-      return apiFetch<any[]>(`/api/clients?${params.toString()}`);
+      return apiFetch<ClientRow[]>(`/api/clients?${params.toString()}`);
     },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await apiFetch('/api/clients', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: formData.tipo === 'corretor' ? 'BROKER' : 'REAL_ESTATE',
-        name: formData.nome,
-        city: formData.cidade,
-        state: formData.uf,
-        whatsapp: formData.whatsapp || undefined,
-        instagram: formData.instagram || undefined,
-        website: formData.site || undefined,
-        monthlyFee: Math.round(Number(formData.valorMensal) * 100),
-        status:
-          formData.status === 'ativo'
-            ? 'ACTIVE'
-            : formData.status === 'pausado'
-            ? 'PAUSED'
-            : 'ARCHIVED',
-        notes: formData.observacoes || undefined,
-      }),
-    });
+    const payload = {
+      type: formData.tipo === 'corretor' ? 'BROKER' : 'REAL_ESTATE',
+      name: formData.nome,
+      city: formData.cidade,
+      state: formData.uf,
+      whatsapp: formData.whatsapp || undefined,
+      instagram: formData.instagram || undefined,
+      website: formData.site || undefined,
+      monthlyFee: Math.round(Number(formData.valorMensal || 0) * 100),
+      dueDay: formData.vencimento ? Number(formData.vencimento) : undefined,
+      status:
+        formData.status === 'ativo'
+          ? 'ACTIVE'
+          : formData.status === 'pausado'
+          ? 'PAUSED'
+          : 'ARCHIVED',
+      notes: formData.observacoes || undefined,
+    };
+
+    if (editingId) {
+      await apiFetch(`/api/clients/${editingId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await apiFetch('/api/clients', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    }
+
     await refetch();
     setIsDialogOpen(false);
+    setEditingId(null);
     setFormData({
       tipo: 'corretor',
       nome: '',
@@ -131,6 +162,7 @@ export default function Clientes() {
       instagram: '',
       site: '',
       valorMensal: '',
+      vencimento: '',
       status: 'ativo',
       observacoes: '',
     });
@@ -147,7 +179,28 @@ export default function Clientes() {
               Gerencie seus clientes e corretores
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEditingId(null);
+                setFormData({
+                  tipo: 'corretor',
+                  nome: '',
+                  cidade: '',
+                  uf: '',
+                  whatsapp: '',
+                  instagram: '',
+                  site: '',
+                  valorMensal: '',
+                  vencimento: '',
+                  status: 'ativo',
+                  observacoes: '',
+                });
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -156,7 +209,7 @@ export default function Clientes() {
             </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>Novo Cliente</DialogTitle>
+                <DialogTitle>{editingId ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
                 <DialogDescription>
                   Preencha os dados para cadastrar um novo cliente
                 </DialogDescription>
@@ -188,15 +241,16 @@ export default function Clientes() {
                         setFormData({ ...formData, status: v })
                       }
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ativo">Ativo</SelectItem>
-                        <SelectItem value="pausado">Pausado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="pausado">Pausado</SelectItem>
+                      <SelectItem value="arquivado">Arquivado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 </div>
 
                 <div className="space-y-2">
@@ -259,6 +313,22 @@ export default function Clientes() {
                         setFormData({ ...formData, valorMensal: e.target.value })
                       }
                       required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Vencimento (dia do mês)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="Ex: 10"
+                      value={formData.vencimento}
+                      onChange={(e) =>
+                        setFormData({ ...formData, vencimento: e.target.value })
+                      }
                     />
                   </div>
                 </div>
@@ -352,94 +422,153 @@ export default function Clientes() {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Localização</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Vencimento</TableHead>
                   <TableHead className="text-right">Valor Mensal</TableHead>
                   <TableHead className="text-right">Última Atualização</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clients.map((client) => (
-                  <TableRow
-                    key={client.id}
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/clientes/${client.id}`)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                          {client.type === 'REAL_ESTATE' ? (
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <User className="h-4 w-4 text-muted-foreground" />
-                          )}
+                {isLoading &&
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <TableRow key={`client-skel-${idx}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-9 w-9 rounded-lg" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-36" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{client.name}</p>
-                          {client.instagram && (
-                            <p className="text-xs text-muted-foreground">
-                              {client.instagram}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="capitalize">
-                      {client.type === 'REAL_ESTATE' ? 'Imobiliária' : 'Corretor'}
-                    </TableCell>
-                    <TableCell>
-                      {client.city}/{client.state}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge
-                        status={
-                          client.status === 'ACTIVE'
-                            ? 'ativo'
-                            : client.status === 'PAUSED'
-                            ? 'pausado'
-                            : 'arquivado'
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(client.monthlyFee / 100)}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {format(new Date(client.updatedAt), 'dd/MM/yyyy', { locale: ptBR })}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/clientes/${client.id}`)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={async (event) => {
-                              event.stopPropagation();
-                              await apiFetch(`/api/clients/${client.id}`, {
-                                method: 'DELETE',
-                              });
-                              await refetch();
-                            }}
-                          >
-                            <Archive className="mr-2 h-4 w-4" />
-                            Arquivar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      </TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))}
+
+                {!isLoading && clients.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      Nenhum cliente encontrado.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
+
+                {!isLoading &&
+                  clients.map((client) => (
+                    <TableRow
+                      key={client.id}
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/clientes/${client.id}`)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                            {client.type === 'REAL_ESTATE' ? (
+                              <Building2 className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <User className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium">{client.name}</p>
+                            {client.instagram && (
+                              <p className="text-xs text-muted-foreground">
+                                {client.instagram}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        {client.type === 'REAL_ESTATE' ? 'Imobiliária' : 'Corretor'}
+                      </TableCell>
+                      <TableCell>
+                        {client.city}/{client.state}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          status={
+                            client.status === 'ACTIVE'
+                              ? 'ativo'
+                              : client.status === 'PAUSED'
+                              ? 'pausado'
+                              : 'arquivado'
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {client.dueDay ? `Dia ${client.dueDay}` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(client.monthlyFee / 100)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {format(new Date(client.updatedAt), 'dd/MM/yyyy', { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`/clientes/${client.id}`)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingId(client.id);
+                                setFormData({
+                                  tipo: client.type === 'BROKER' ? 'corretor' : 'imobiliaria',
+                                  nome: client.name,
+                                  cidade: client.city,
+                                  uf: client.state,
+                                  whatsapp: client.whatsapp ?? '',
+                                  instagram: client.instagram ?? '',
+                                  site: client.website ?? '',
+                                  valorMensal: String(client.monthlyFee / 100),
+                                  vencimento: client.dueDay ? String(client.dueDay) : '',
+                                  status:
+                                    client.status === 'ACTIVE'
+                                      ? 'ativo'
+                                      : client.status === 'PAUSED'
+                                      ? 'pausado'
+                                      : 'arquivado',
+                                  observacoes: client.notes ?? '',
+                                });
+                                setIsDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={async (event) => {
+                                event.stopPropagation();
+                                await apiFetch(`/api/clients/${client.id}`, {
+                                  method: 'DELETE',
+                                });
+                                await refetch();
+                              }}
+                            >
+                              <Archive className="mr-2 h-4 w-4" />
+                              Arquivar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
           </CardContent>

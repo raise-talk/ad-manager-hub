@@ -3,13 +3,13 @@ import "./globals.css";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "TrafegoAds",
-  description: "Painel de gestão de tráfego pago para imobiliárias e corretores.",
+  title: "Ad Manager Hub",
+  description: "Painel de gestao de trafego pago para imobiliarias e corretores.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
       </body>

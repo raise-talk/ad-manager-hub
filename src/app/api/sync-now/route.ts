@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/require-auth";
 import { fetchAllInsights, getStoredAccessToken } from "@/server/meta";
+
+const LOOKBACK_DAYS = 90; // keep in sync with cron
 
 const pickPrimaryResult = (
   actions: Array<{ action_type: string; value: string }> | undefined
@@ -18,15 +21,9 @@ const pickPrimaryResult = (
   return 0;
 };
 
-const verifyCron = (request: Request) => {
-  const secret = request.headers.get("x-cron-secret");
-  return secret && secret === process.env.CRON_SECRET;
-};
-
-export async function GET(request: Request) {
-  if (!verifyCron(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function POST() {
+  const { response } = await requireAuth();
+  if (response) return response;
 
   const integration = await prisma.metaIntegration.findFirst({
     where: { status: "CONNECTED" },
@@ -42,7 +39,6 @@ export async function GET(request: Request) {
     distinct: ["adAccountId"],
   });
 
-  const LOOKBACK_DAYS = 90; // fetch enough history to support dashboard filters
   const to = new Date();
   const from = new Date();
   from.setDate(to.getDate() - LOOKBACK_DAYS);

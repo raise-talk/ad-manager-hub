@@ -1,49 +1,51 @@
 "use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useSidebar } from "@/components/layout/SidebarContext";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useAlertCount } from "@/hooks/use-alert-count";
+import { useBranding } from "@/hooks/use-branding";
+import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  Users,
-  Megaphone,
   Bell,
-  Wallet,
+  ChevronLeft,
+  HelpCircle,
+  LayoutDashboard,
+  Megaphone,
   Plug,
   Settings,
-  HelpCircle,
-  ChevronLeft,
+  Users,
+  Wallet,
   Zap,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useSidebar } from '@/components/layout/SidebarContext';
-import { useAlertCount } from '@/hooks/use-alert-count';
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Clientes', href: '/clientes', icon: Users },
-  { name: 'Campanhas', href: '/campanhas', icon: Megaphone },
-  { name: 'Alertas', href: '/alertas', icon: Bell, badge: 2 },
-  { name: 'Financeiro', href: '/financeiro', icon: Wallet },
-  { name: 'Integrações', href: '/integracoes', icon: Plug },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Clientes", href: "/clientes", icon: Users },
+  { name: "Campanhas", href: "/campanhas", icon: Megaphone },
+  { name: "Alertas", href: "/alertas", icon: Bell, badge: 2 },
+  { name: "Financeiro", href: "/financeiro", icon: Wallet },
+  { name: "Integrações", href: "/integracoes", icon: Plug },
 ];
 
 const secondaryNavigation = [
-  { name: 'Configurações', href: '/configuracoes', icon: Settings },
-  { name: 'Ajuda', href: '/ajuda', icon: HelpCircle },
+  { name: "Configurações", href: "/configuracoes", icon: Settings },
+  { name: "Ajuda", href: "/ajuda", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed } = useSidebar();
   const { data: alertCount = 0 } = useAlertCount();
+  const { brandName } = useBranding();
 
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 h-screen border-r border-border bg-sidebar transition-all duration-300',
-        collapsed ? 'w-16' : 'w-64'
+        "fixed left-0 top-0 z-40 h-screen border-r border-border bg-sidebar transition-all duration-300",
+        collapsed ? "w-16" : "w-64"
       )}
     >
       <div className="flex h-full flex-col">
@@ -55,7 +57,7 @@ export function AppSidebar() {
             </div>
             {!collapsed && (
               <span className="font-semibold text-sidebar-foreground">
-                TrafegoAds
+                {brandName}
               </span>
             )}
           </Link>
@@ -63,8 +65,8 @@ export function AppSidebar() {
             variant="ghost"
             size="icon"
             className={cn(
-              'h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent',
-              collapsed && 'hidden'
+              "h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent",
+              collapsed && "hidden"
             )}
             onClick={() => setCollapsed(!collapsed)}
           >
@@ -81,10 +83,10 @@ export function AppSidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
               >
                 <item.icon className="h-5 w-5 shrink-0" />
@@ -96,7 +98,7 @@ export function AppSidebar() {
                         variant="destructive"
                         className="h-5 min-w-5 justify-center px-1.5 text-xs"
                       >
-                        {item.name === 'Alertas' ? alertCount : item.badge}
+                        {item.name === "Alertas" ? alertCount : item.badge}
                       </Badge>
                     )}
                   </>
@@ -115,10 +117,10 @@ export function AppSidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
               >
                 <item.icon className="h-5 w-5 shrink-0" />

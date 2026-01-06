@@ -4,6 +4,23 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/require-auth";
 import { profileSchema } from "@/lib/validators";
 
+export async function GET() {
+  const { response, session } = await requireAuth();
+  if (response) return response;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session?.user.id ?? "" },
+    select: { id: true, name: true, email: true, profileImage: true },
+  });
+
+  return NextResponse.json({
+    id: user?.id,
+    name: user?.name ?? "",
+    email: user?.email ?? "",
+    profileImage: user?.profileImage ?? null,
+  });
+}
+
 export async function PUT(request: Request) {
   const { response, session } = await requireAuth();
   if (response) {
@@ -28,9 +45,16 @@ export async function PUT(request: Request) {
     data: {
       name: parsed.data.name,
       email: parsed.data.email,
+      profileImage: parsed.data.profileImage ?? null,
       passwordHash: passwordHash ?? undefined,
     },
+    select: { id: true, name: true, email: true, profileImage: true },
   });
 
-  return NextResponse.json({ id: user.id, name: user.name, email: user.email });
+  return NextResponse.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    profileImage: user.profileImage ?? null,
+  });
 }

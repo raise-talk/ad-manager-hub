@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Facebook,
   CheckCircle2,
@@ -15,6 +15,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -30,17 +31,34 @@ import {
 } from '@/components/ui/alert';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { toast } from '@/components/ui/sonner';
+import { Loader2 } from 'lucide-react';
+
+type Integration = {
+  status?: string;
+  metaUserName?: string;
+  metaUserId?: string;
+};
+
+type AdAccount = {
+  id: string;
+  name: string;
+  status?: string;
+};
 
 export default function Integracoes() {
-  const { data: integration, refetch } = useQuery({
+  const { data: integration, refetch } = useQuery<Integration>({
     queryKey: ['meta', 'integration'],
-    queryFn: () => apiFetch<any>('/api/meta/integration'),
+    queryFn: () => apiFetch<Integration>('/api/meta/integration'),
   });
 
-  const { data: adAccounts = [], refetch: refetchAccounts } = useQuery({
+  const { data: adAccounts = [], refetch: refetchAccounts, isLoading: accountsLoading } = useQuery<AdAccount[]>({
     queryKey: ['ad-accounts'],
-    queryFn: () => apiFetch<any[]>('/api/ad-accounts'),
+    queryFn: () => apiFetch<AdAccount[]>('/api/ad-accounts'),
   });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingCampaigns, setIsSyncingCampaigns] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const isConnected = integration?.status === 'CONNECTED';
 
@@ -52,13 +70,44 @@ export default function Integracoes() {
   };
 
   const handleDisconnect = async () => {
-    await apiFetch('/api/meta/integration', { method: 'DELETE' });
-    await refetch();
+    try {
+      setIsDisconnecting(true);
+      await apiFetch('/api/meta/integration', { method: 'DELETE' });
+      toast.success('Integração desconectada');
+      await refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível desconectar agora.');
+    } finally {
+      setIsDisconnecting(false);
+    }
   };
 
   const handleSyncAccounts = async () => {
-    await apiFetch('/api/meta/sync-accounts', { method: 'POST' });
-    await refetchAccounts();
+    try {
+      setIsSyncing(true);
+      await apiFetch('/api/meta/sync-accounts', { method: 'POST' });
+      toast.success('Contas sincronizadas com sucesso');
+      await refetchAccounts();
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível sincronizar as contas.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSyncCampaigns = async () => {
+    try {
+      setIsSyncingCampaigns(true);
+      await apiFetch('/api/meta/sync-campaigns', { method: 'POST' });
+      toast.success('Campanhas sincronizadas com sucesso');
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível sincronizar as campanhas.');
+    } finally {
+      setIsSyncingCampaigns(false);
+    }
   };
 
   const accounts = useMemo(() => adAccounts, [adAccounts]);
@@ -118,13 +167,29 @@ export default function Integracoes() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleSyncAccounts}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Sincronizar contas
+                    <Button variant="outline" size="sm" onClick={handleSyncAccounts} disabled={isSyncing}>
+                      {isSyncing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      {isSyncing ? 'Sincronizando...' : 'Sincronizar contas'}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={handleDisconnect}>
-                      <Unlink className="mr-2 h-4 w-4" />
-                      Desconectar
+                    <Button variant="outline" size="sm" onClick={handleSyncCampaigns} disabled={isSyncingCampaigns}>
+                      {isSyncingCampaigns ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      {isSyncingCampaigns ? 'Sincronizando campanhas...' : 'Sincronizar campanhas'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleDisconnect} disabled={isDisconnecting}>
+                      {isDisconnecting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Unlink className="mr-2 h-4 w-4" />
+                      )}
+                      {isDisconnecting ? 'Desconectando...' : 'Desconectar'}
                     </Button>
                     </div>
                   </div>
@@ -142,31 +207,50 @@ export default function Integracoes() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {accounts.map((account: any) => (
-                        <TableRow key={account.id}>
-                          <TableCell className="font-medium">{account.name}</TableCell>
-                          <TableCell className="text-muted-foreground font-mono text-sm">
-                            {account.id}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                String(account.status).toLowerCase().includes('active')
-                                  ? 'bg-success/15 text-success border-success/30'
-                                  : 'bg-warning/15 text-warning border-warning/30'
-                              }
-                            >
-                              {String(account.status).toLowerCase().includes('active') ? 'Ativo' : 'Pausado'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="sm">
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
+                      {accountsLoading &&
+                        Array.from({ length: 3 }).map((_, idx) => (
+                          <TableRow key={`acc-skel-${idx}`}>
+                            <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-8 w-10 ml-auto" /></TableCell>
+                          </TableRow>
+                        ))}
+
+                      {!accountsLoading &&
+                        accounts.map((account: AdAccount) => (
+                          <TableRow key={account.id}>
+                            <TableCell className="font-medium">{account.name}</TableCell>
+                            <TableCell className="text-muted-foreground font-mono text-sm">
+                              {account.id}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  String(account.status).toUpperCase() === 'ACTIVE'
+                                    ? 'bg-success/15 text-success border-success/30'
+                                    : 'bg-warning/15 text-warning border-warning/30'
+                                }
+                              >
+                                {String(account.status).toUpperCase() === 'ACTIVE' ? 'Ativo' : 'Pausado'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm">
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+
+                      {!accountsLoading && accounts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                            Nenhuma conta sincronizada. Clique em “Sincronizar contas”.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>

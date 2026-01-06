@@ -7,18 +7,36 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useBranding } from '@/hooks/use-branding';
 
 export default function RecuperarSenha() {
+  const { brandName } = useBranding();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsSent(true);
-    setIsLoading(false);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Erro ao enviar email');
+      }
+      setIsSent(true);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Não foi possível enviar o email. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -32,7 +50,7 @@ export default function RecuperarSenha() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold">TrafegoAds</span>
+          <span className="text-xl font-bold">{brandName}</span>
         </div>
 
         <Card className="border-0 shadow-xl">
@@ -102,6 +120,7 @@ export default function RecuperarSenha() {
                     'Enviar instruções'
                   )}
                 </Button>
+                {errorMsg && <p className="text-sm text-destructive text-center">{errorMsg}</p>}
 
                 <Link href="/login" className="block">
                   <Button variant="ghost" className="w-full">

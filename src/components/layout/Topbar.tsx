@@ -1,20 +1,9 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Search,
-  Menu,
-  Bell,
-  ChevronDown,
-  User,
-  Settings,
-  LogOut,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useSidebar } from "@/components/layout/SidebarContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,35 +11,46 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useSidebar } from '@/components/layout/SidebarContext';
-import { apiFetch } from '@/lib/api';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { useBranding } from "@/hooks/use-branding";
+import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, ChevronDown, LogOut, Menu, Settings } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+type AlertPreview = {
+  id: string;
+  severity?: "HIGH" | "MEDIUM" | "LOW" | string;
+  message?: string;
+  client?: { name?: string };
+};
 
 export function Topbar() {
   const router = useRouter();
   const { collapsed, setCollapsed, setMobileOpen } = useSidebar();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const { data: session } = useSession();
-  const { data: alerts = [] } = useQuery({
-    queryKey: ['alerts', 'preview'],
-    queryFn: () => apiFetch<any[]>('/api/alerts?status=new'),
+  const { profilePhoto } = useBranding();
+  const { data: alerts = [] } = useQuery<AlertPreview[]>({
+    queryKey: ["alerts", "preview"],
+    queryFn: () => apiFetch<AlertPreview[]>("/api/alerts?status=new"),
   });
 
   const unreadAlerts = alerts.length;
 
   const handleLogout = () => {
-    signOut({ callbackUrl: '/login' });
+    signOut({ callbackUrl: "/login" });
   };
 
   return (
     <header
       className={cn(
-        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300',
-        collapsed ? 'left-16' : 'left-64',
-        'max-lg:left-0'
+        "fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300",
+        collapsed ? "left-16" : "left-64",
+        "max-lg:left-0"
       )}
     >
       {/* Left Section */}
@@ -69,22 +69,11 @@ export function Topbar() {
         <Button
           variant="ghost"
           size="icon"
-          className={cn('hidden lg:flex', !collapsed && 'hidden')}
+          className={cn("hidden lg:flex", !collapsed && "hidden")}
           onClick={() => setCollapsed(false)}
         >
           <Menu className="h-5 w-5" />
         </Button>
-
-        {/* Search */}
-        <div className="relative hidden w-64 md:block lg:w-80">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar clientes, campanhas..."
-            className="h-9 pl-9 bg-muted/50 border-0 focus-visible:ring-1"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
       </div>
 
       {/* Right Section */}
@@ -114,19 +103,19 @@ export function Topbar() {
               <DropdownMenuItem
                 key={alert.id}
                 className="flex flex-col items-start gap-1 p-3"
-                onClick={() => router.push('/alertas')}
+                onClick={() => router.push("/alertas")}
               >
                 <div className="flex w-full items-center justify-between">
                   <span className="font-medium text-sm">
-                    {alert.client?.name ?? 'Conta'}
+                    {alert.client?.name ?? "Conta"}
                   </span>
                   <Badge
                     variant={
-                      alert.severity === 'HIGH'
-                        ? 'destructive'
-                        : alert.severity === 'MEDIUM'
-                        ? 'secondary'
-                        : 'outline'
+                      alert.severity === "HIGH"
+                        ? "destructive"
+                        : alert.severity === "MEDIUM"
+                        ? "secondary"
+                        : "outline"
                     }
                     className="text-xs"
                   >
@@ -141,7 +130,7 @@ export function Topbar() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="justify-center text-primary"
-              onClick={() => router.push('/alertas')}
+              onClick={() => router.push("/alertas")}
             >
               Ver todos os alertas
             </DropdownMenuItem>
@@ -153,36 +142,43 @@ export function Topbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2 pl-2 pr-1">
               <Avatar className="h-7 w-7">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                {session?.user?.name?.charAt(0) ?? "A"}
-              </AvatarFallback>
-            </Avatar>
-            <span className="hidden text-sm font-medium md:inline-block">
-              {session?.user?.name ?? "Admin"}
-            </span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                {profilePhoto && (
+                  <AvatarImage
+                    src={profilePhoto}
+                    alt={session?.user?.name ?? "Avatar"}
+                  />
+                )}
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  {session?.user?.name?.charAt(0) ?? "A"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden text-sm font-medium md:inline-block">
+                {session?.user?.name ?? "Admin"}
+              </span>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{session?.user?.name ?? "Admin"}</p>
+                <p className="text-sm font-medium">
+                  {session?.user?.name ?? "Admin"}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  {session?.user?.email ?? ''}
+                  {session?.user?.email ?? ""}
                 </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push('/configuracoes')}>
-              <User className="mr-2 h-4 w-4" />
-              Perfil
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/configuracoes')}>
+            <DropdownMenuItem onClick={() => router.push("/configuracoes")}>
               <Settings className="mr-2 h-4 w-4" />
               Configurações
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="text-destructive"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>

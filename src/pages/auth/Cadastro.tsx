@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useBranding } from '@/hooks/use-branding';
 
 export default function Cadastro() {
   const router = useRouter();
+  const { brandName } = useBranding();
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -90,7 +92,7 @@ export default function Cadastro() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold">TrafegoAds</span>
+          <span className="text-xl font-bold">{brandName}</span>
         </div>
 
         <Card className="border-0 shadow-xl">

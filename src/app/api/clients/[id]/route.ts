@@ -30,6 +30,8 @@ export async function GET(
 
   const normalizedClient = {
     ...client,
+    dueDay: client.dueDay,
+    lastPaymentAt: client.lastPaymentAt,
     adAccounts:
       client.adAccounts?.map((item) => ({
         ...item,

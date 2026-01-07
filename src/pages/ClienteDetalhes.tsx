@@ -142,7 +142,7 @@ export default function ClienteDetalhes() {
         status: client.status ?? "ACTIVE",
       });
     }
-  }, [client?.notes]);
+  }, [client]);
 
   if (isLoading) {
     return (

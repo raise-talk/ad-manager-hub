@@ -44,7 +44,7 @@ const buildDateRange = (preset: string, to: Date, timeZone: string) => {
   const end = getDateInTz(to, timeZone);
   const start = getDateInTz(to, timeZone);
 
-  const useYesterdayWindow = (days: number) => {
+  const setYesterdayWindow = (days: number) => {
     // end = fim do dia de ontem (no fuso alvo)
     end.setDate(end.getDate() - 1);
     end.setHours(23, 59, 59, 999);
@@ -60,16 +60,16 @@ const buildDateRange = (preset: string, to: Date, timeZone: string) => {
       end.setHours(23, 59, 59, 999);
       break;
     case "yesterday":
-      useYesterdayWindow(1);
+      setYesterdayWindow(1);
       break;
     case "7d":
-      useYesterdayWindow(7);
+      setYesterdayWindow(7);
       break;
     case "30d":
-      useYesterdayWindow(30);
+      setYesterdayWindow(30);
       break;
     case "90d":
-      useYesterdayWindow(90);
+      setYesterdayWindow(90);
       break;
     default:
       start.setHours(0, 0, 0, 0);

@@ -50,9 +50,12 @@ type AlertConfig = {
   enabled: boolean;
 };
 
-type AlertItem = Alert & {
+type AlertItem = {
+  id: string;
   severity: "LOW" | "MEDIUM" | "HIGH";
   status: "NEW" | "READ" | "RESOLVED";
+  message?: string;
+  type?: string;
   adAccount?: { name?: string; id?: string };
   client?: { name?: string };
   campaign?: {
@@ -92,7 +95,7 @@ export default function Alertas() {
   }, [alertConfig]);
 
   const {
-    data: alerts = [],
+    data: alertsData,
     refetch,
     isLoading,
   } = useQuery<AlertItem[]>({
@@ -111,6 +114,7 @@ export default function Alertas() {
       return apiFetch<AlertItem[]>(`/api/alerts?${params.toString()}`);
     },
   });
+  const alerts: AlertItem[] = alertsData ?? [];
 
   const mapSeverity = (severity: "LOW" | "MEDIUM" | "HIGH"): AlertSeverity => {
     if (severity === "HIGH") return "critical";

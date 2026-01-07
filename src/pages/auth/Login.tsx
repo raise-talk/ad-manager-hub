@@ -31,7 +31,8 @@ export default function Login() {
       return;
     }
     
-    const callbackUrl = searchParams.get('from') ?? '/dashboard';
+    const fromParam = searchParams?.get('from');
+    const callbackUrl = fromParam ?? '/dashboard';
     const result = await signIn('credentials', {
       email,
       password,

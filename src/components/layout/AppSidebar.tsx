@@ -37,6 +37,7 @@ const secondaryNavigation = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const currentPath = pathname ?? "";
   const { collapsed, setCollapsed } = useSidebar();
   const { data: alertCount = 0 } = useAlertCount();
   const { brandName } = useBranding();
@@ -77,7 +78,8 @@ export function AppSidebar() {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-2 py-4">
           {navigation.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+            const isActive =
+              currentPath === item.href || currentPath.startsWith(item.href);
             return (
               <Link
                 key={item.name}
@@ -111,7 +113,8 @@ export function AppSidebar() {
         {/* Secondary Navigation */}
         <div className="border-t border-sidebar-border px-2 py-4">
           {secondaryNavigation.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+            const isActive =
+              currentPath === item.href || currentPath.startsWith(item.href);
             return (
               <Link
                 key={item.name}

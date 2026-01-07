@@ -61,7 +61,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function ClienteDetalhes() {
-  const { id } = useParams();
+  const params = useParams();
+  const id =
+    typeof params?.id === "string"
+      ? params.id
+      : Array.isArray(params?.id)
+      ? params?.id[0]
+      : "";
   const router = useRouter();
   const [notes, setNotes] = useState("");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);

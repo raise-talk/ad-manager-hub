@@ -734,7 +734,7 @@ export default function Campanhas() {
                     </Button>
                     <Button
                       variant="outline"
-                      disabled={statusMutation.isLoading}
+                      disabled={statusMutation.isPending}
                       onClick={() => handlePauseToggle(selectedCampaign)}
                     >
                       {mapStatus(selectedCampaign.status) === "pausado" ? (
@@ -745,7 +745,7 @@ export default function Campanhas() {
                       ) : (
                         <>
                           <Pause className="mr-2 h-4 w-4" />
-                          {statusMutation.isLoading ? "Pausando..." : "Pausar"}
+                          {statusMutation.isPending ? "Pausando..." : "Pausar"}
                         </>
                       )}
                     </Button>

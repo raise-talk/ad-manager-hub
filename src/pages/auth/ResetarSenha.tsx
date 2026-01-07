@@ -14,8 +14,8 @@ export default function ResetarSenha() {
   const { brandName } = useBranding();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [email, setEmail] = useState<string>(() => searchParams.get("email") ?? "");
-  const [token, setToken] = useState<string>(() => searchParams.get("token") ?? "");
+  const [email, setEmail] = useState<string>(() => searchParams?.get("email") ?? "");
+  const [token, setToken] = useState<string>(() => searchParams?.get("token") ?? "");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -23,8 +23,8 @@ export default function ResetarSenha() {
   const [isDone, setIsDone] = useState(false);
 
   useEffect(() => {
-    setEmail(searchParams.get("email") ?? "");
-    setToken(searchParams.get("token") ?? "");
+    setEmail(searchParams?.get("email") ?? "");
+    setToken(searchParams?.get("token") ?? "");
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {

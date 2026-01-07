@@ -70,6 +70,12 @@ type FinanceClient = {
   paidThisMonth?: boolean;
 };
 
+type PaymentStatus = {
+  label: string;
+  variant: 'default' | 'secondary' | 'destructive' | 'outline';
+  dueDate: Date | null;
+};
+
 export default function Financeiro() {
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({
@@ -132,7 +138,7 @@ export default function Financeiro() {
     return months;
   }, [clients]);
 
-  const computePaymentStatus = (client: FinanceClient) => {
+  const computePaymentStatus = (client: FinanceClient): PaymentStatus => {
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();

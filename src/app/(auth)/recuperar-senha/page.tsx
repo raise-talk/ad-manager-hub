@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import RecuperarSenha from "@/pages/auth/RecuperarSenha";
 
 export default function RecuperarSenhaPage() {
-  return <RecuperarSenha />;
+  return (
+    <Suspense>
+      <RecuperarSenha />
+    </Suspense>
+  );
 }

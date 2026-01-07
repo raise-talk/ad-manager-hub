@@ -7,11 +7,13 @@ import { apiFetch } from "@/lib/api";
 type Branding = {
   brandName: string;
   profilePhoto: string | null;
+  brandLogo: string | null;
 };
 
 export function useBranding(): Branding {
-  const [brandName, setBrandName] = useState<string>("Seu negócio");
+  const [brandName, setBrandName] = useState<string>("Lead House");
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [brandLogo, setBrandLogo] = useState<string | null>(null);
 
   const { data: businessData, refetch: refetchBusiness } = useQuery<{
     businessName: string;
@@ -31,8 +33,13 @@ export function useBranding(): Branding {
   useEffect(() => {
     if (businessData?.businessName) {
       setBrandName(businessData.businessName);
+    } else {
+      setBrandName("Lead House");
     }
-  }, [businessData?.businessName]);
+    if (businessData?.businessLogo !== undefined) {
+      setBrandLogo(businessData.businessLogo);
+    }
+  }, [businessData?.businessName, businessData?.businessLogo]);
 
   useEffect(() => {
     if (profileData?.profileImage !== undefined) {
@@ -52,5 +59,5 @@ export function useBranding(): Branding {
     };
   }, [refetchBusiness, refetchProfile]);
 
-  return { brandName, profilePhoto };
+  return { brandName, profilePhoto, brandLogo };
 }

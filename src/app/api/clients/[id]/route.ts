@@ -65,9 +65,11 @@ export async function PUT(
     );
   }
 
+  const data = parsed.data as any;
+
   const client = await prisma.client.update({
     where: { id: params.id },
-    data: parsed.data,
+    data,
   });
 
   return NextResponse.json(client);

@@ -10,6 +10,7 @@ datasource db {
 enum ClientType {
   BROKER
   REAL_ESTATE
+  OTHER
 }
 
 enum ClientStatus {

@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   }
 
   const client = await prisma.client.create({
-    data: parsed.data,
+    data: parsed.data as any,
   });
 
   return NextResponse.json(client, { status: 201 });

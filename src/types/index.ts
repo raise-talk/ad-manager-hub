@@ -1,6 +1,6 @@
 // Core Types for the SaaS
 
-export type ClientType = 'corretor' | 'imobiliaria';
+export type ClientType = 'corretor' | 'imobiliaria' | 'outro';
 export type ClientStatus = 'ativo' | 'pausado' | 'arquivado';
 export type CampaignStatus = 'ativo' | 'pausado' | 'encerrado' | 'em_revisao';
 export type CampaignObjective = 'leads' | 'conversoes' | 'trafego' | 'alcance' | 'engajamento';

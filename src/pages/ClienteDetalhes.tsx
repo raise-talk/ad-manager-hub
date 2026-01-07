@@ -429,8 +429,7 @@ export default function ClienteDetalhes() {
                   />
                 </div>
                 <p className="text-muted-foreground">
-                  {client.type === "REAL_ESTATE" ? "Imobiliária" : "Corretor"} -{" "}
-                  {client.city}/{client.state}
+                  {client.type === "REAL_ESTATE" ? "Imobiliária" : client.type === "BROKER" ? "Corretor" : "Outro"} - {client.city}/{client.state}
                 </p>
               </div>
             </div>
@@ -1095,6 +1094,8 @@ export default function ClienteDetalhes() {
     </AppLayout>
   );
 }
+
+
 
 
 

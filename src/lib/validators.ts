@@ -12,7 +12,7 @@ export const loginSchema = z.object({
 });
 
 export const clientSchema = z.object({
-  type: z.enum(["BROKER", "REAL_ESTATE"]),
+  type: z.enum(["BROKER", "REAL_ESTATE", "OTHER"]),
   name: z.string().min(2),
   city: z.string().min(1),
   state: z.string().min(2).max(2),

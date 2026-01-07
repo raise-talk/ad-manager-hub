@@ -37,6 +37,9 @@ const getDateInTz = (date: Date, timeZone: string) =>
 const formatDateTz = (date: Date, timeZone: string) =>
   new Intl.DateTimeFormat("en-CA", { timeZone }).format(date);
 
+const MS_IN_DAY = 1000 * 60 * 60 * 24;
+const parseBudget = (value: string | number | null | undefined) => Number(value ?? 0);
+
 const buildDateRange = (preset: string, to: Date, timeZone: string) => {
   const end = getDateInTz(to, timeZone);
   const start = getDateInTz(to, timeZone);
@@ -74,9 +77,12 @@ const buildDateRange = (preset: string, to: Date, timeZone: string) => {
       break;
   }
 
+  const diffDays = Math.floor((end.getTime() - start.getTime()) / MS_IN_DAY) + 1;
+
   return {
     since: formatDateTz(start, timeZone),
     until: formatDateTz(end, timeZone),
+    days: Math.max(1, diffDays),
   };
 };
 
@@ -169,46 +175,53 @@ export async function GET(request: Request) {
 
           if (detailsRes.status === "fulfilled" && detailsRes.value) {
             const details = detailsRes.value;
-            const campaignDaily = Number(details.daily_budget ?? 0);
-            const campaignLifetime = Number(details.lifetime_budget ?? 0);
+            const campaignDaily = parseBudget(details.daily_budget);
+            const campaignLifetime = parseBudget(details.lifetime_budget);
             dailyBudget = Math.max(dailyBudget, campaignDaily);
             lifetimeBudget = Math.max(lifetimeBudget, campaignLifetime);
           }
 
           if (adSetsRes.status === "fulfilled" && adSetsRes.value) {
-            const activeSum = adSetsRes.value.data
-              .filter((a) => {
-                const raw = `${a.status ?? ""} ${a.effective_status ?? ""}`.toLowerCase();
-                return raw.includes("active");
-              })
-              .reduce(
-                (acc, a) =>
-                  acc +
-                  Number(
-                    a.daily_budget ??
-                      a.budget_remaining ??
-                      0,
-                  ),
-                0,
-              );
-            const allSum = adSetsRes.value.data.reduce(
-              (acc, a) =>
-                acc +
-                Number(
-                  a.daily_budget ??
-                    a.budget_remaining ??
-                    0,
-                ),
-              0,
-            );
-            const adSetDaily = activeSum || allSum || 0;
-            dailyBudget = Math.max(dailyBudget, Number(adSetDaily ?? 0));
+            const adSets = adSetsRes.value.data;
+            const isActive = (a: { status?: string | null; effective_status?: string | null }) => {
+              const raw = `${a.status ?? ""} ${a.effective_status ?? ""}`.toLowerCase();
+              return raw.includes("active");
+            };
+            const sumBudget = (items: typeof adSets) =>
+              items.reduce((acc, a) => {
+                const daily = parseBudget(a.daily_budget);
+                const remaining = parseBudget(a.budget_remaining);
+                const val = daily || remaining || 0;
+                return acc + val;
+              }, 0);
+
+            const activeSum = sumBudget(adSets.filter(isActive));
+            const allSum = sumBudget(adSets);
+            let adSetDaily = activeSum || allSum || 0;
+
+            // Proteção: se a API devolver em unidade maior (R$) e não centavos, corrige.
+            if (adSetDaily > 0 && adSetDaily < 100 && spendCents > 0) {
+              adSetDaily = Math.round(adSetDaily * 100);
+            }
+
+            dailyBudget = Math.max(dailyBudget, adSetDaily);
 
             const lifeSum = adSetsRes.value.data.reduce(
-              (acc, a) => acc + Number(a.lifetime_budget ?? 0),
+              (acc, a) => acc + parseBudget(a.lifetime_budget),
               0,
             );
             lifetimeBudget = Math.max(lifetimeBudget, Number(lifeSum ?? 0));
+          }
+
+          // Se não encontramos budget diário explícito, podemos derivar de lifetime
+          if (dailyBudget === 0 && lifetimeBudget > 0) {
+            const estimated = Math.floor(lifetimeBudget / Math.max(1, dateRange.days));
+            dailyBudget = Math.max(dailyBudget, estimated);
+          }
+
+          // Último recurso: se ainda zerado mas houve gasto, usar gasto médio diário
+          if (dailyBudget === 0 && spendCents > 0 && dateRange.days > 0) {
+            dailyBudget = Math.round(spendCents / dateRange.days);
           }
         } catch (err) {
           console.error("campaign enrichment error", err);

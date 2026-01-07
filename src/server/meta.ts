@@ -217,7 +217,8 @@ export const fetchCampaignAdSets = async (accessToken: string, campaignId: strin
 export const fetchCampaignDetails = async (accessToken: string, campaignId: string) => {
   const params = new URLSearchParams({
     access_token: accessToken,
-    fields: "id,name,daily_budget,lifetime_budget,budget_remaining,status,effective_status",
+    fields:
+      "id,name,daily_budget,lifetime_budget,budget_remaining,status,effective_status,issues_info",
   });
   const response = await fetch(`${META_BASE}/${campaignId}?${params.toString()}`);
   if (!response.ok) {

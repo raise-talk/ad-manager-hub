@@ -13,6 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -50,7 +58,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -108,13 +116,16 @@ const mapStatus = (status?: string | null) => {
 };
 
 export default function Campanhas() {
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [clientFilter, setClientFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("ativo");
   const [rangeFilter, setRangeFilter] = useState<string>("today");
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
     null
   );
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const clientsQuery = useQuery<Client[]>({
     queryKey: ["clients"],
@@ -145,6 +156,8 @@ export default function Campanhas() {
       }
       if (searchQuery) params.set("search", searchQuery);
       if (rangeFilter) params.set("range", rangeFilter);
+      params.set("tz", "America/Sao_Paulo");
+      params.set("to", new Date().toISOString());
       return apiFetch<Campaign[]>(`/api/campaigns?${params.toString()}`);
     },
   });
@@ -168,6 +181,12 @@ export default function Campanhas() {
     [campaignsQuery.data]
   );
 
+  // debounce busca para evitar re-renders e requisições desnecessárias
+  useEffect(() => {
+    const handle = setTimeout(() => setSearchQuery(searchInput.trim()), 250);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
   const filteredCampaigns = useMemo(() => {
     const searchLower = searchQuery.toLowerCase();
     return campaigns
@@ -180,6 +199,43 @@ export default function Campanhas() {
         return mapStatus(campaign.status) === statusFilter;
       });
   }, [campaigns, clientFilter, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    searchQuery,
+    clientFilter,
+    statusFilter,
+    rangeFilter,
+    campaignsQuery.data,
+  ]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredCampaigns.length / pageSize));
+
+  useEffect(() => {
+    if (page > pageCount) {
+      setPage(pageCount);
+    }
+  }, [page, pageCount]);
+
+  const paginatedCampaigns = useMemo(
+    () =>
+      filteredCampaigns.slice(
+        (page - 1) * pageSize,
+        (page - 1) * pageSize + pageSize
+      ),
+    [filteredCampaigns, page]
+  );
+
+  const showingFrom =
+    filteredCampaigns.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo =
+    filteredCampaigns.length === 0
+      ? 0
+      : Math.min(
+          filteredCampaigns.length,
+          (page - 1) * pageSize + paginatedCampaigns.length
+        );
 
   const totalGasto = filteredCampaigns.reduce(
     (acc, campaign) => acc + Number(campaign.spendCents ?? 0),
@@ -219,9 +275,6 @@ export default function Campanhas() {
         </TableCell>
         <TableCell>
           <Skeleton className="h-4 w-20" />
-        </TableCell>
-        <TableCell className="text-right">
-          <Skeleton className="h-4 w-16 ml-auto" />
         </TableCell>
         <TableCell className="text-right">
           <Skeleton className="h-4 w-16 ml-auto" />
@@ -289,8 +342,8 @@ export default function Campanhas() {
                 <Input
                   placeholder="Buscar campanhas..."
                   className="pl-9"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                 />
               </div>
               <Select value={clientFilter} onValueChange={setClientFilter}>
@@ -344,7 +397,6 @@ export default function Campanhas() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Objetivo</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Orç. diário</TableHead>
                   <TableHead className="text-right">Gasto total</TableHead>
                   <TableHead className="text-right">Resultados</TableHead>
                   <TableHead className="text-right">CPA</TableHead>
@@ -358,7 +410,7 @@ export default function Campanhas() {
                   filteredCampaigns.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={9}
+                        colSpan={8}
                         className="py-10 text-center text-muted-foreground"
                       >
                         Nenhuma campanha encontrada para os filtros
@@ -368,7 +420,7 @@ export default function Campanhas() {
                   )}
 
                 {!campaignsQuery.isLoading &&
-                  filteredCampaigns.map((campaign) => {
+                  paginatedCampaigns.map((campaign) => {
                     const client = clients.find(
                       (item) => item.id === campaign.clientId
                     );
@@ -395,11 +447,6 @@ export default function Campanhas() {
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={mapStatus(campaign.status)} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {currency.format(
-                            Number(campaign.dailyBudget ?? 0) / 100
-                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {currency.format(
@@ -452,6 +499,48 @@ export default function Campanhas() {
                   })}
               </TableBody>
             </Table>
+            <div className="flex flex-col gap-2 px-6 py-4 md:flex-row md:items-center md:justify-between">
+              <span className="text-sm text-muted-foreground w-full">
+                {filteredCampaigns.length === 0
+                  ? "Nenhuma campanha para exibir"
+                  : `Mostrando ${showingFrom}-${showingTo} de ${filteredCampaigns.length}`}
+              </span>
+              <Pagination className="md:justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      className={
+                        page === 1 ? "pointer-events-none opacity-50" : ""
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.max(1, prev - 1));
+                      }}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive>
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      className={
+                        page === pageCount
+                          ? "pointer-events-none opacity-50"
+                          : ""
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.min(pageCount, prev + 1));
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </CardContent>
         </Card>
 

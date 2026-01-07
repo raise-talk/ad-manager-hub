@@ -185,7 +185,7 @@ export default function Integracoes() {
   const accounts = useMemo(() => adAccounts, [adAccounts]);
 
   const openInMeta = (adAccountId: string) => {
-    const actId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
+    const actId = adAccountId.replace("act_", "");
     const url = `https://www.facebook.com/adsmanager/manage/campaigns?act=${actId}`;
     window.open(url, "_blank");
   };

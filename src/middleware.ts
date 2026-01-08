@@ -30,6 +30,7 @@ export const config = {
     "/campanhas/:path*",
     "/alertas/:path*",
     "/financeiro/:path*",
+    "/calculadora/:path*",
     "/integracoes/:path*",
     "/configuracoes/:path*",
     "/ajuda/:path*",

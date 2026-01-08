@@ -9,6 +9,7 @@ import {
   Bell,
   Wallet,
   Plug,
+  Calculator,
   Settings,
   HelpCircle,
   X,
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Campanhas', href: '/campanhas', icon: Megaphone },
   { name: 'Alertas', href: '/alertas', icon: Bell, badge: 2 },
   { name: 'Financeiro', href: '/financeiro', icon: Wallet },
+  { name: 'Calculadora', href: '/calculadora', icon: Calculator },
   { name: 'Integrações', href: '/integracoes', icon: Plug },
 ];
 

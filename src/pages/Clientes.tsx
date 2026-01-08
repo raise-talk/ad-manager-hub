@@ -1,45 +1,9 @@
 ﻿"use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Plus,
-  Search,
-  Filter,
-  MoreHorizontal,
-  Eye,
-  Pencil,
-  Archive,
-  Building2,
-  User,
-} from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -48,15 +12,51 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge } from "@/components/shared/StatusBadge";
-import type { ClientType, ClientStatus } from "@/types";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { apiFetch } from "@/lib/api";
+import type { ClientStatus, ClientType } from "@/types";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  Archive,
+  Building2,
+  Eye,
+  Filter,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  User,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
- type ClientRow = {
+type ClientRow = {
   id: string;
   type: "BROKER" | "REAL_ESTATE" | "OTHER";
   name: string;
@@ -99,7 +99,11 @@ export default function Clientes() {
     }).format(value);
   };
 
-  const { data: clients = [], refetch, isLoading } = useQuery<ClientRow[]>({
+  const {
+    data: clients = [],
+    refetch,
+    isLoading,
+  } = useQuery<ClientRow[]>({
     queryKey: ["clients", statusFilter, searchQuery],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -181,7 +185,7 @@ export default function Clientes() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
-            <p className="text-muted-foreground">Gerencie seus clientes e corretores</p>
+            <p className="text-muted-foreground">Gerencie seus clientes</p>
           </div>
           <Dialog
             open={isDialogOpen}
@@ -213,8 +217,12 @@ export default function Clientes() {
             </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>{editingId ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
-                <DialogDescription>Preencha os dados para cadastrar um novo cliente</DialogDescription>
+                <DialogTitle>
+                  {editingId ? "Editar Cliente" : "Novo Cliente"}
+                </DialogTitle>
+                <DialogDescription>
+                  Preencha os dados para cadastrar um novo cliente
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -222,7 +230,9 @@ export default function Clientes() {
                     <Label>Tipo</Label>
                     <Select
                       value={formData.tipo}
-                      onValueChange={(v: ClientType) => setFormData({ ...formData, tipo: v })}
+                      onValueChange={(v: ClientType) =>
+                        setFormData({ ...formData, tipo: v })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -238,7 +248,9 @@ export default function Clientes() {
                     <Label>Status</Label>
                     <Select
                       value={formData.status}
-                      onValueChange={(v: ClientStatus) => setFormData({ ...formData, status: v })}
+                      onValueChange={(v: ClientStatus) =>
+                        setFormData({ ...formData, status: v })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -257,7 +269,9 @@ export default function Clientes() {
                   <Input
                     placeholder="Nome do cliente ou empresa"
                     value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nome: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -268,7 +282,9 @@ export default function Clientes() {
                     <Input
                       placeholder="Cidade"
                       value={formData.cidade}
-                      onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cidade: e.target.value })
+                      }
                       required
                     />
                   </div>
@@ -278,7 +294,12 @@ export default function Clientes() {
                       placeholder="UF"
                       maxLength={2}
                       value={formData.uf}
-                      onChange={(e) => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          uf: e.target.value.toUpperCase(),
+                        })
+                      }
                       required
                     />
                   </div>
@@ -290,7 +311,9 @@ export default function Clientes() {
                     <Input
                       placeholder="(00) 00000-0000"
                       value={formData.whatsapp}
-                      onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, whatsapp: e.target.value })
+                      }
                       required
                     />
                   </div>
@@ -300,7 +323,12 @@ export default function Clientes() {
                       placeholder="R$ 0,00"
                       type="number"
                       value={formData.valorMensal}
-                      onChange={(e) => setFormData({ ...formData, valorMensal: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          valorMensal: e.target.value,
+                        })
+                      }
                       required
                     />
                   </div>
@@ -315,7 +343,9 @@ export default function Clientes() {
                       max={31}
                       placeholder="Ex: 10"
                       value={formData.vencimento}
-                      onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, vencimento: e.target.value })
+                      }
                     />
                   </div>
                 </div>
@@ -326,7 +356,9 @@ export default function Clientes() {
                     <Input
                       placeholder="@usuario"
                       value={formData.instagram}
-                      onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, instagram: e.target.value })
+                      }
                     />
                   </div>
                   <div className="space-y-2">
@@ -334,7 +366,9 @@ export default function Clientes() {
                     <Input
                       placeholder="www.site.com.br"
                       value={formData.site}
-                      onChange={(e) => setFormData({ ...formData, site: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, site: e.target.value })
+                      }
                     />
                   </div>
                 </div>
@@ -344,13 +378,19 @@ export default function Clientes() {
                   <Textarea
                     placeholder="Notas sobre o cliente..."
                     value={formData.observacoes}
-                    onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, observacoes: e.target.value })
+                    }
                     rows={3}
                   />
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
                     Cancelar
                   </Button>
                   <Button type="submit">Salvar Cliente</Button>
@@ -401,7 +441,9 @@ export default function Clientes() {
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Vencimento</TableHead>
                   <TableHead className="text-right">Valor Mensal</TableHead>
-                  <TableHead className="text-right">Última Atualização</TableHead>
+                  <TableHead className="text-right">
+                    Última Atualização
+                  </TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -444,7 +486,10 @@ export default function Clientes() {
 
                 {!isLoading && clients.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-muted-foreground"
+                    >
                       Nenhum cliente encontrado.
                     </TableCell>
                   </TableRow>
@@ -477,12 +522,16 @@ export default function Clientes() {
                             <div>
                               <p className="font-medium">{client.name}</p>
                               {client.instagram && (
-                                <p className="text-xs text-muted-foreground">{client.instagram}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {client.instagram}
+                                </p>
                               )}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="capitalize">{readableType}</TableCell>
+                        <TableCell className="capitalize">
+                          {readableType}
+                        </TableCell>
                         <TableCell>
                           {client.city}/{client.state}
                         </TableCell>
@@ -504,17 +553,26 @@ export default function Clientes() {
                           {formatCurrency(client.monthlyFee / 100)}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
-                          {format(new Date(client.updatedAt), "dd/MM/yyyy", { locale: ptBR })}
+                          {format(new Date(client.updatedAt), "dd/MM/yyyy", {
+                            locale: ptBR,
+                          })}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuTrigger
+                              asChild
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <Button variant="ghost" size="icon">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => router.push(`/clientes/${client.id}`)}>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(`/clientes/${client.id}`)
+                                }
+                              >
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver detalhes
                               </DropdownMenuItem>
@@ -535,8 +593,12 @@ export default function Clientes() {
                                     whatsapp: client.whatsapp ?? "",
                                     instagram: client.instagram ?? "",
                                     site: client.website ?? "",
-                                    valorMensal: String(client.monthlyFee / 100),
-                                    vencimento: client.dueDay ? String(client.dueDay) : "",
+                                    valorMensal: String(
+                                      client.monthlyFee / 100
+                                    ),
+                                    vencimento: client.dueDay
+                                      ? String(client.dueDay)
+                                      : "",
                                     status:
                                       client.status === "ACTIVE"
                                         ? "ativo"

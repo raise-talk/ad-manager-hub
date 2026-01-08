@@ -50,6 +50,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       if (current.startsWith("/campanhas")) return "Campanhas";
       if (current.startsWith("/alertas")) return "Alertas";
       if (current.startsWith("/financeiro")) return "Financeiro";
+      if (current.startsWith("/calculadora")) return "Calculadora";
       if (current.startsWith("/integracoes")) return "Integrações";
       if (current.startsWith("/configuracoes")) return "Configurações";
       if (current.startsWith("/ajuda")) return "Ajuda";

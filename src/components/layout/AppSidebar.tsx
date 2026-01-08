@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   Bell,
   ChevronLeft,
+  Calculator,
   HelpCircle,
   LayoutDashboard,
   Megaphone,
@@ -27,6 +28,7 @@ const navigation = [
   { name: "Campanhas", href: "/campanhas", icon: Megaphone },
   { name: "Alertas", href: "/alertas", icon: Bell, badge: 2 },
   { name: "Financeiro", href: "/financeiro", icon: Wallet },
+  { name: "Calculadora", href: "/calculadora", icon: Calculator },
   { name: "Integrações", href: "/integracoes", icon: Plug },
 ];
 

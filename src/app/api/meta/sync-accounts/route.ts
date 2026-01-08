@@ -27,9 +27,10 @@ export async function POST() {
   const accessToken = getStoredAccessToken(integration.accessTokenEncrypted);
   const { data } = await fetchAdAccounts(accessToken);
 
-  await Promise.all(
-    data.map((account) =>
-      prisma.adAccount.upsert({
+  // Usa uma transação única para evitar abrir várias conexões paralelas (evita "too many connections")
+  await prisma.$transaction(async (tx) => {
+    for (const account of data) {
+      await tx.adAccount.upsert({
         where: { id: account.id },
         update: {
           name: account.name,
@@ -46,13 +47,13 @@ export async function POST() {
           status: mapAccountStatus(account.account_status),
           spendCap: account.spend_cap ? BigInt(account.spend_cap) : undefined,
         },
-      }),
-    ),
-  );
+      });
+    }
 
-  await prisma.metaIntegration.update({
-    where: { id: integration.id },
-    data: { lastSyncAt: new Date() },
+    await tx.metaIntegration.update({
+      where: { id: integration.id },
+      data: { lastSyncAt: new Date() },
+    });
   });
 
   return NextResponse.json({ synced: data.length });

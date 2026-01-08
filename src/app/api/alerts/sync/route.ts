@@ -52,7 +52,8 @@ export async function POST() {
   const fourteenDaysAgo = new Date();
   fourteenDaysAgo.setDate(to.getDate() - 14);
 
-  const [integration, campaigns, snapshots, existingAlertsRaw] = await Promise.all([
+  // Usa uma transação única para evitar abrir várias conexões em paralelo (mitiga "too many connections")
+  const [integration, campaigns, snapshots, existingAlertsRaw] = await prisma.$transaction([
     prisma.metaIntegration.findUnique({ where: { userId } }),
     prisma.campaign.findMany({
       include: {
@@ -306,16 +307,18 @@ export async function POST() {
     }
   }
 
-  await prisma.alert.deleteMany({});
+  await prisma.$transaction(async (tx) => {
+    await tx.alert.deleteMany({});
 
-  if (alerts.length > 0) {
-    await prisma.alert.createMany({
-      data: alerts.map((a) => ({
-        ...a,
-        type: "BUDGET_LOW", // enum limitado, reutilizado para todos os alertas
-      })),
-    });
-  }
+    if (alerts.length > 0) {
+      await tx.alert.createMany({
+        data: alerts.map((a) => ({
+          ...a,
+          type: "BUDGET_LOW", // enum limitado, reutilizado para todos os alertas
+        })),
+      });
+    }
+  });
 
   return NextResponse.json({ created: alerts.length });
 }

@@ -231,7 +231,7 @@ export default function Alertas() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="flex flex-wrap gap-2">
+          <TabsList className="w-full justify-start gap-2 md:inline-flex md:w-auto">
             <TabsTrigger value="feed">Feed de Alertas</TabsTrigger>
             <TabsTrigger value="config">Configurações</TabsTrigger>
           </TabsList>

@@ -241,7 +241,7 @@ export default function Integracoes() {
             ) : isConnected ? (
               <div className="space-y-6">
                 {/* Connected Profile */}
-                <div className="flex items-center justify-between p-4 rounded-lg bg-muted">
+                <div className="flex flex-col gap-3 rounded-lg bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <Facebook className="h-5 w-5 text-primary" />
@@ -253,12 +253,13 @@ export default function Integracoes() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleSyncAccounts}
                       disabled={isSyncing}
+                      className="w-full sm:w-auto"
                     >
                       {isSyncing ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -273,6 +274,7 @@ export default function Integracoes() {
                       size="sm"
                       onClick={handleSyncCampaigns}
                       disabled={isSyncingCampaigns}
+                      className="w-full sm:w-auto"
                     >
                       {isSyncingCampaigns ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -289,6 +291,7 @@ export default function Integracoes() {
                       size="sm"
                       onClick={handleDisconnect}
                       disabled={isDisconnecting}
+                      className="w-full sm:w-auto"
                     >
                       {isDisconnecting ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -305,84 +308,88 @@ export default function Integracoes() {
                   <h3 className="text-sm font-medium mb-3">
                     Contas de Anúncio Disponíveis
                   </h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome da Conta</TableHead>
-                        <TableHead>ID da Conta</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {accountsLoading &&
-                        Array.from({ length: 3 }).map((_, idx) => (
-                          <TableRow key={`acc-skel-${idx}`}>
-                            <TableCell>
-                              <Skeleton className="h-4 w-48" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-4 w-32" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-6 w-20" />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Skeleton className="h-8 w-10 ml-auto" />
-                            </TableCell>
+                  <div className="rounded-lg border">
+                    <div className="w-full overflow-x-auto">
+                      <Table className="min-w-[640px]">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome da Conta</TableHead>
+                            <TableHead>ID da Conta</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
                           </TableRow>
-                        ))}
+                        </TableHeader>
+                        <TableBody>
+                          {accountsLoading &&
+                            Array.from({ length: 3 }).map((_, idx) => (
+                              <TableRow key={`acc-skel-${idx}`}>
+                                <TableCell>
+                                  <Skeleton className="h-4 w-48" />
+                                </TableCell>
+                                <TableCell>
+                                  <Skeleton className="h-4 w-32" />
+                                </TableCell>
+                                <TableCell>
+                                  <Skeleton className="h-6 w-20" />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Skeleton className="h-8 w-10 ml-auto" />
+                                </TableCell>
+                              </TableRow>
+                            ))}
 
-                      {!accountsLoading &&
-                        accounts.map((account: AdAccount) => (
-                          <TableRow key={account.id}>
-                            <TableCell className="font-medium">
-                              {account.name}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground font-mono text-sm">
-                              {account.id}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  String(account.status).toUpperCase() ===
-                                  "ACTIVE"
-                                    ? "bg-success/15 text-success border-success/30"
-                                    : "bg-warning/15 text-warning border-warning/30"
-                                }
-                              >
-                                {String(account.status).toUpperCase() ===
-                                "ACTIVE"
-                                  ? "Ativo"
-                                  : "Pausado"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openInMeta(account.id)}
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                          {!accountsLoading &&
+                            accounts.map((account: AdAccount) => (
+                              <TableRow key={account.id}>
+                                <TableCell className="font-medium">
+                                  {account.name}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground font-mono text-sm">
+                                  {account.id}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      String(account.status).toUpperCase() ===
+                                      "ACTIVE"
+                                        ? "bg-success/15 text-success border-success/30"
+                                        : "bg-warning/15 text-warning border-warning/30"
+                                    }
+                                  >
+                                    {String(account.status).toUpperCase() ===
+                                    "ACTIVE"
+                                      ? "Ativo"
+                                      : "Pausado"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openInMeta(account.id)}
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
 
-                      {!accountsLoading && accounts.length === 0 && (
-                        <TableRow>
-                          <TableCell
-                            colSpan={4}
-                            className="py-6 text-center text-muted-foreground"
-                          >
-                            Nenhuma conta sincronizada. Clique em “Sincronizar
-                            contas”.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                          {!accountsLoading && accounts.length === 0 && (
+                            <TableRow>
+                              <TableCell
+                                colSpan={4}
+                                className="py-6 text-center text-muted-foreground"
+                              >
+                                Nenhuma conta sincronizada. Clique em “Sincronizar
+                                contas”.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Permissions Info */}

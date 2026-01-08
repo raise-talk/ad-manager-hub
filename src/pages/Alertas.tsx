@@ -231,7 +231,7 @@ export default function Alertas() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
+          <TabsList className="flex flex-wrap gap-2">
             <TabsTrigger value="feed">Feed de Alertas</TabsTrigger>
             <TabsTrigger value="config">Configurações</TabsTrigger>
           </TabsList>
@@ -241,12 +241,12 @@ export default function Alertas() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:flex-wrap">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
                     <Select
                       value={statusFilter}
                       onValueChange={setStatusFilter}
                     >
-                      <SelectTrigger className="w-36">
+                      <SelectTrigger className="w-full sm:w-36">
                         <Filter className="mr-2 h-4 w-4" />
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
@@ -261,7 +261,7 @@ export default function Alertas() {
                       value={severityFilter}
                       onValueChange={setSeverityFilter}
                     >
-                      <SelectTrigger className="w-36">
+                      <SelectTrigger className="w-full sm:w-36">
                         <SelectValue placeholder="Severidade" />
                       </SelectTrigger>
                       <SelectContent>
@@ -278,6 +278,7 @@ export default function Alertas() {
                       size="sm"
                       onClick={handleSyncAlerts}
                       disabled={syncing}
+                      className="w-full sm:w-auto"
                     >
                       {syncing ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -290,6 +291,7 @@ export default function Alertas() {
                       variant="outline"
                       size="sm"
                       onClick={handleMarkAllRead}
+                      className="w-full sm:w-auto"
                     >
                       <CheckCircle className="mr-2 h-4 w-4" />
                       Marcar todos como lidos
@@ -346,7 +348,7 @@ export default function Alertas() {
                       }`}
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
+                        <div className="flex gap-3 sm:gap-4">
                           <div
                             className={`p-2 rounded-lg ${
                               severity === "critical"
@@ -366,7 +368,7 @@ export default function Alertas() {
                               }`}
                             />
                           </div>
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 space-y-3">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium">
                                 {alert.client?.name ?? "Conta"}
@@ -376,10 +378,10 @@ export default function Alertas() {
                                 {alert.adAccount?.name ?? "Meta"}
                               </span>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">
+                            <p className="text-sm text-muted-foreground">
                               {alert.message}
                             </p>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
                               <SeverityBadge severity={severity} />
                               <StatusBadge status={status} />
                               <span className="text-xs text-muted-foreground">
@@ -390,52 +392,53 @@ export default function Alertas() {
                                 )}
                               </span>
                             </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2 justify-end md:flex-nowrap">
-                            {alert.campaign?.id && (
-                              <>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                              {alert.campaign?.id && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  className="w-full sm:w-auto"
                                   onClick={() => handleOpenMeta(alert)}
                                 >
                                   <ExternalLink className="mr-2 h-4 w-4" />
                                   Ver na Meta
                                 </Button>
-                              </>
-                            )}
-                            {alert.status === "NEW" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={async () => {
-                                  await apiFetch(
-                                    `/api/alerts/${alert.id}/read`,
-                                    { method: "POST" }
-                                  );
-                                  await refetch();
-                                }}
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                Marcar lido
-                              </Button>
-                            )}
-                            {alert.status !== "RESOLVED" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={async () => {
-                                  await apiFetch(
-                                    `/api/alerts/${alert.id}/resolve`,
-                                    { method: "POST" }
-                                  );
-                                  await refetch();
-                                }}
-                              >
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Resolver
-                              </Button>
-                            )}
+                              )}
+                              {alert.status === "NEW" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full sm:w-auto"
+                                  onClick={async () => {
+                                    await apiFetch(
+                                      `/api/alerts/${alert.id}/read`,
+                                      { method: "POST" }
+                                    );
+                                    await refetch();
+                                  }}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Marcar lido
+                                </Button>
+                              )}
+                              {alert.status !== "RESOLVED" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full sm:w-auto"
+                                  onClick={async () => {
+                                    await apiFetch(
+                                      `/api/alerts/${alert.id}/resolve`,
+                                      { method: "POST" }
+                                    );
+                                    await refetch();
+                                  }}
+                                >
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Resolver
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </CardContent>
